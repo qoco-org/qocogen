@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qocogen"
+version = "0.1.0"
+description = "QOCOGEN: Custom Code Generator for the QOCO solver"
+# readme = "README.md"
+requires-python = ">=3.8"
+authors = [{ name = "Govind M. Chari", email = "govindchari1@gmail.com" }]
+dependencies = ["jinja2", "numpy>=1.7", "qdldl", "scipy>=0.13.2", "setuptools"]
+
+[tool.scikit-build]
+install.components = ["python"]
+wheel.install-dir = "qocogen"
+
+[project.urls]
+Homepage = "https://github.com/qoco-org/qocogen"
+Issues = "https://github.com/qoco-org/qocogen/issues"
