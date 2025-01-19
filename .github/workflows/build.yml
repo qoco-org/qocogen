@@ -1,0 +1,58 @@
+# Taken from osqp-python
+
+name: Build Wheels
+
+on:
+  # Triggers the workflow on push or pull request events
+  push:
+    branches:
+      - "*"
+      - "*/*"
+      - "**"
+  pull_request:
+    branches: [main]
+
+jobs:
+  build_sdist:
+    name: Build source
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@master
+        with:
+          submodules: "recursive"
+
+      - name: Build source and wheel
+        run: |
+          python -m pip install build
+          python -m build --outdir=wheelhouse
+
+      - name: Upload sdist and wheel to github
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: wheelhouse/*
+          if-no-files-found: error
+
+  build_wheels:
+    name: Building wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - uses: pypa/cibuildwheel@v2.21
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
