@@ -34,25 +34,3 @@ jobs:
           name: wheels-sdist
           path: wheelhouse/*
           if-no-files-found: error
-
-  build_wheels:
-    name: Building wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-13, macos-latest]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-
-      - uses: pypa/cibuildwheel@v2.21
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-${{ matrix.os }}
-          path: wheelhouse/*.whl
