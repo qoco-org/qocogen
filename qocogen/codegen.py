@@ -993,10 +993,8 @@ def generate_kkt(
     f.write("   }\n")
     f.write("   nt_multiply(work->W, work->ubuff3, work->Ds);\n\n")
     f.write("   // Compute step-size.\n")
-    f.write("   nt_multiply(work->Winv, work->Ds, work->ubuff3);\n")
-    f.write("   nt_multiply(work->W, &work->xyz[work->n + work->p], work->ubuff2);\n")
     f.write(
-        "   double a = qoco_min(linesearch(work->lambda, work->ubuff3, 0.99, work), linesearch(work->lambda, work->ubuff2, 0.99, work));\n"
+        "   double a = qoco_min(linesearch(work->s, work->Ds, 0.99, work), linesearch(work->z, &work->xyz[work->n + work->p], 0.99, work));\n"
     )
     f.write("   work->a = a;\n\n")
     f.write("   // Update iterate.\n")
@@ -1159,7 +1157,7 @@ def generate_utils(
     f.write("   work->settings.max_iters = 200;\n")
     f.write("   work->settings.bisect_iters = 5;\n")
     if generate_ruiz:
-        f.write("   work->settings.ruiz_iters = 1;\n")
+        f.write("   work->settings.ruiz_iters = 5;\n")
     else:
         f.write("   work->settings.ruiz_iters = 0;\n")
     f.write("   work->settings.iter_ref_iters = 1;\n")
@@ -1464,6 +1462,7 @@ def generate_utils(
     f.write("   // Compute objective.\n")
     f.write("   double obj = dot(work->c, work->x, work->n);\n")
     f.write("   Px(work->x, work->xbuff, work);\n")
+    f.write("   double xPx = dot(work->x, work->xbuff, work->n);\n")
     f.write("   obj += 0.5 * dot(work->x, work->xbuff, work->n);\n")
     f.write("   work->sol.obj = obj * work->kinv;\n")
     f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
@@ -1484,10 +1483,11 @@ def generate_utils(
     f.write("   scale_arrayf(work->xbuff, work->xbuff, work->kinv, work->n);\n")
     f.write("   double dres = inf_norm(work->xbuff, work->n);\n")
     f.write("   work->sol.pres = pres;\n")
-    f.write("   work->sol.dres = dres;\n")
-    f.write("   ew_product(work->s, work->Fruiz, work->ubuff1, work->m);\n")
-    f.write("   ew_product(work->z, work->Fruiz, work->ubuff2, work->m);\n")
-    f.write("   double gap = dot(work->ubuff1, work->ubuff2, work->m);\n")
+    f.write("   work->sol.dres = dres;\n\n")
+    f.write("   double ctx = dot(work->c, work->x, work->n);\n")
+    f.write("   double bty = dot(work->b, work->y, work->p);\n")
+    f.write("   double htz = dot(work->h, work->z, work->m);\n")
+    f.write("   double gap = qoco_abs(xPx + ctx + bty + htz);\n")
     f.write("   gap *= work->kinv;\n")
     f.write("   work->sol.gap = gap;\n\n")
 
@@ -1534,8 +1534,10 @@ def generate_utils(
     f.write("   dres_rel = qoco_max(dres_rel, cinf);\n")
     f.write("   dres_rel *= work->kinv;\n")
 
-    f.write("   // Compute max{sinf, zinf}.\n")
-    f.write("   double gap_rel = qoco_max(sinf, zinf);\n\n")
+    f.write("   // Compute max{abs(xPx), abs(ctx), abs(bty), abs(htz)}.\n")
+    f.write("   double gap_rel = qoco_max(qoco_abs(xPx), qoco_abs(ctx));\n")
+    f.write("   gap_rel = qoco_max(gap_rel, qoco_abs(bty));")
+    f.write("   gap_rel = qoco_max(gap_rel, qoco_abs(htz));")
 
     f.write(
         "   // If the solver stalled (a = 0) check if low tolerance stopping criteria is met.\n "
