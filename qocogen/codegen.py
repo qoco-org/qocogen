@@ -118,8 +118,8 @@ def generate_cmakelists(solver_dir):
     f = open(solver_dir + "/CMakeLists.txt", "a")
     f.write("cmake_minimum_required(VERSION 3.18)\n")
     f.write("project(qoco_custom)\n\n")
-    f.write("if(ENABLE_PRINTING)\n")
-    f.write("   add_compile_definitions(ENABLE_PRINTING)\n")
+    f.write("if(DISABLE_PRINTING)\n")
+    f.write("   add_compile_definitions(DISABLE_PRINTING)\n")
     f.write("endif()\n\n")
     f.write("if(QOCO_CUSTOM_BUILD_TYPE STREQUAL Debug)\n")
     f.write("   set(QOCO_CUSTOM_BUILD_TYPE Debug)\n")
@@ -1083,7 +1083,7 @@ def generate_utils(
     f.write("unsigned char check_stopping(Workspace* work);\n")
     f.write("void copy_solution(Workspace* work);\n")
     f.write("void unscale_solution(Workspace* work);\n")
-    f.write("#ifdef ENABLE_PRINTING\n")
+    f.write("#ifndef DISABLE_PRINTING\n")
     f.write("#include <stdio.h>\n")
     f.write("void print_header(Workspace* work);\n")
     f.write("void print_footer(Workspace* work);\n")
@@ -1585,7 +1585,7 @@ def generate_utils(
     Gnnz = len(G.data) if G is not None else 0
 
     f.write("void print_header(Workspace* work) {\n")
-    f.write("#ifdef ENABLE_PRINTING\n")
+    f.write("#ifndef DISABLE_PRINTING\n")
     f.write('   printf("\\n");\n')
     f.write(
         '   printf("+-------------------------------------------------------+\\n");\n'
@@ -1665,7 +1665,7 @@ def generate_utils(
     f.write("}\n\n")
 
     f.write("void print_footer(Workspace* work) {\n")
-    f.write("#ifdef ENABLE_PRINTING\n")
+    f.write("#ifndef DISABLE_PRINTING\n")
     f.write(
         '       printf("\\nstatus: %s ", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);\n'
     )
@@ -1675,7 +1675,7 @@ def generate_utils(
     f.write("}\n\n")
 
     f.write("void log_iter(Workspace* work) {\n")
-    f.write("#ifdef ENABLE_PRINTING\n")
+    f.write("#ifndef DISABLE_PRINTING\n")
     f.write(
         'printf("|   %2d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |   %.3f   |\\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->a);'
     )
