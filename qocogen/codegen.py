@@ -1062,6 +1062,13 @@ def generate_utils(
     f.write('   "maximum iterations reached",\n')
     f.write("};\n\n")
 
+    f.write("void update_P(Workspace* work, double* P_new);\n")
+    f.write("void update_A(Workspace* work, double* A_new);\n")
+    f.write("void update_G(Workspace* work, double* G_new);\n")
+    f.write("void update_c(Workspace* work, double* c_new);\n")
+    f.write("void update_b(Workspace* work, double* b_new);\n")
+    f.write("void update_h(Workspace* work, double* h_new);\n")
+
     f.write("void load_data(Workspace* work);\n")
     f.write("void set_default_settings(Workspace* work);\n")
     f.write("void copy_arrayf(double* x, double* y, int n);\n")
@@ -1093,19 +1100,55 @@ def generate_utils(
     f.close()
 
     # Write source.
+    N = n + m + p
+    Pnnz = len(P.data) if P is not None else 0
+    Annz = len(A.data) if A is not None else 0
+    Gnnz = len(G.data) if G is not None else 0
+
     f = open(solver_dir + "/utils.c", "a")
     write_license(f)
     f.write('#include "utils.h"\n\n')
+    f.write("void update_P(Workspace* work, double* P_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % Pnnz)
+    f.write("       work->P[i] = P_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
+    f.write("void update_A(Workspace* work, double* A_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % Annz)
+    f.write("       work->A[i] = A_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
+    f.write("void update_G(Workspace* work, double* G_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % Gnnz)
+    f.write("       work->G[i] = G_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
+    f.write("void update_c(Workspace* work, double* c_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % n)
+    f.write("       work->c[i] = c_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
+    f.write("void update_b(Workspace* work, double* b_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % p)
+    f.write("       work->b[i] = b_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
+    f.write("void update_h(Workspace* work, double* h_new) {\n")
+    f.write("   for (int i = 0; i < %d; ++i) {\n" % m)
+    f.write("       work->h[i] = h_new[i];\n")
+    f.write("   }\n")
+    f.write("}\n\n")
+
 
     f.write("void load_data(Workspace* work) {\n")
     f.write("   work->n = %d;\n" % n)
     f.write("   work->m = %d;\n" % m)
     f.write("   work->p = %d;\n" % p)
-
-    N = n + m + p
-    Pnnz = len(P.data) if P is not None else 0
-    Annz = len(A.data) if A is not None else 0
-    Gnnz = len(G.data) if G is not None else 0
 
     for i in range(Pnnz):
         f.write("   work->P[%i] = %.17g;\n" % (i, P.data[i]))
