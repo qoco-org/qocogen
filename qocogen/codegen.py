@@ -1527,10 +1527,9 @@ def generate_utils(
     f.write("   double dres = inf_norm(work->xbuff, work->n);\n")
     f.write("   work->sol.pres = pres;\n")
     f.write("   work->sol.dres = dres;\n\n")
-    f.write("   double ctx = dot(work->c, work->x, work->n);\n")
-    f.write("   double bty = dot(work->b, work->y, work->p);\n")
-    f.write("   double htz = dot(work->h, work->z, work->m);\n")
-    f.write("   double gap = qoco_abs(xPx + ctx + bty + htz);\n")
+    f.write("   ew_product(work->s, work->Fruiz, work->ubuff1, work->m);\n")
+    f.write("   ew_product(work->z, work->Fruiz, work->ubuff2, work->m);\n")
+    f.write("   double gap = dot(work->ubuff1, work->ubuff2, work->m);\n")
     f.write("   gap *= work->kinv;\n")
     f.write("   work->sol.gap = gap;\n\n")
 
@@ -1577,10 +1576,8 @@ def generate_utils(
     f.write("   dres_rel = qoco_max(dres_rel, cinf);\n")
     f.write("   dres_rel *= work->kinv;\n")
 
-    f.write("   // Compute max{abs(xPx), abs(ctx), abs(bty), abs(htz)}.\n")
-    f.write("   double gap_rel = qoco_max(qoco_abs(xPx), qoco_abs(ctx));\n")
-    f.write("   gap_rel = qoco_max(gap_rel, qoco_abs(bty));")
-    f.write("   gap_rel = qoco_max(gap_rel, qoco_abs(htz));")
+    f.write("   // Compute max{sinf, zinf}.\n")
+    f.write("   double gap_rel = qoco_max(sinf, zinf);\n\n")
 
     f.write(
         "   // If the solver stalled (a = 0) check if low tolerance stopping criteria is met.\n "
