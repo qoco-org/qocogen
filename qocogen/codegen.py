@@ -1505,7 +1505,6 @@ def generate_utils(
     f.write("   // Compute objective.\n")
     f.write("   double obj = dot(work->c, work->x, work->n);\n")
     f.write("   Px(work->x, work->xbuff, work);\n")
-    f.write("   double xPx = dot(work->x, work->xbuff, work->n);\n")
     f.write("   obj += 0.5 * dot(work->x, work->xbuff, work->n);\n")
     f.write("   work->sol.obj = obj * work->kinv;\n")
     f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
