@@ -285,14 +285,14 @@ def generate_ldl(solver_dir, n, m, p, P, A, G, perm, Lidx, Wsparse2dense):
                 )
         f.write(";\n")
         if perm[j] < n:
-            f.write("   if (work->D[%i] < 1e-12) {\n" % j)
+            f.write("   if (work->D[%i] < 0) {\n" % j)
             f.write("       work->D[%i] = work->settings.kkt_dynamic_reg;\n" % j)
             f.write("   }\n")
             f.write("   else {\n")
             f.write("       work->D[%i] += work->settings.kkt_dynamic_reg;\n" % j)
             f.write("   }\n")
         else:
-            f.write("   if (work->D[%i] > -1e-12) {\n" % j)
+            f.write("   if (work->D[%i] > 0) {\n" % j)
             f.write("       work->D[%i] = -work->settings.kkt_dynamic_reg;\n" % j)
             f.write("   }\n")
             f.write("   else {\n")
