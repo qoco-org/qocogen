@@ -1505,6 +1505,7 @@ def generate_utils(
     f.write("   // Compute objective.\n")
     f.write("   double obj = dot(work->c, work->x, work->n);\n")
     f.write("   Px(work->x, work->xbuff, work);\n")
+    f.write("   double xPx = dot(work->x, work->xbuff, work->n);\n")
     f.write("   obj += 0.5 * dot(work->x, work->xbuff, work->n);\n")
     f.write("   work->sol.obj = obj * work->kinv;\n")
     f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
@@ -1576,7 +1577,17 @@ def generate_utils(
     f.write("   dres_rel *= work->kinv;\n")
 
     f.write("   // Compute max{sinf, zinf}.\n")
-    f.write("   double gap_rel = qoco_max(sinf, zinf);\n\n")
+    f.write("   double ctx = dot(work->c, work->x, work->n);\n")
+    f.write("   double bty = dot(work->b, work->y, work->p);\n")
+    f.write("   double htz = dot(work->h, work->z, work->m);\n\n")
+
+    f.write("   double pobj = 0.5 * xPx + ctx;\n")
+    f.write("   double dobj = -0.5 * xPx - bty - htz;\n")
+    f.write("   pobj = qoco_abs(pobj);\n")
+    f.write("   dobj = qoco_abs(dobj);\n\n")
+
+    f.write("   double gap_rel = qoco_max(1, pobj);\n")
+    f.write("   gap_rel = qoco_max(gap_rel, dobj);\n\n")
 
     f.write(
         "   // If the solver stalled (a = 0) check if low tolerance stopping criteria is met.\n "
