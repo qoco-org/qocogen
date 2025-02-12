@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qocogen"
-version = "0.1.1"
+version = "0.1.2"
 description = "QOCOGEN: Custom Code Generator for the QOCO solver"
 readme = "README.md"
 requires-python = ">=3.8"
