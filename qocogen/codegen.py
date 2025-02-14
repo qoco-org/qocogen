@@ -129,17 +129,20 @@ def generate_cmakelists(solver_dir):
     f.write("else()\n")
     f.write("   set(QOCO_CUSTOM_BUILD_TYPE Release)\n")
     f.write('   set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n')
-    f.write("endif()\n")
+    f.write("endif()\n\n")
     f.write('message(STATUS "Build Type: " ${QOCO_CUSTOM_BUILD_TYPE})\n')
     f.write('message(STATUS "Build Flags: " ${CMAKE_C_FLAGS})\n')
 
     f.write('set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n\n')
+    f.write('set(qoco_custom_sources "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.c")\n\n')
+    f.write('set(qoco_custom_headers "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.h")\n\n')
+
     f.write("# Build qoco_custom shared library.\n")
     f.write("add_library(qoco_custom SHARED)\n")
     f.write(
-        "target_sources(qoco_custom PRIVATE qoco_custom.c cone.c utils.c ldl.c kkt.c)\n\n"
+        "target_sources(qoco_custom PRIVATE ${qoco_custom_sources} ${qoco_custom_headers})\n"
     )
-    f.write("target_link_libraries(qoco_custom m)\n")
+    f.write("target_link_libraries(qoco_custom m)\n\n")
     f.write("# Build qoco demo.\n")
     f.write("add_executable(runtest runtest.c)\n")
     f.write("target_link_libraries(runtest qoco_custom)\n")
@@ -1717,10 +1720,10 @@ def generate_utils(
     f.write("void print_footer(Workspace* work) {\n")
     f.write("#ifndef DISABLE_PRINTING\n")
     f.write(
-        '       printf("\\nstatus: %s ", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);\n'
+        '   printf("\\nstatus: %s ", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);\n'
     )
-    f.write('       printf("\\nnumber of iterations: %d ", work->sol.iters);\n')
-    f.write('       printf("\\nobjective: %f ", work->sol.obj);\n')
+    f.write('   printf("\\nnumber of iterations: %d ", work->sol.iters);\n')
+    f.write('   printf("\\nobjective: %f ", work->sol.obj);\n')
     f.write("#endif\n")
     f.write("}\n\n")
 
