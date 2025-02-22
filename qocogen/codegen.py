@@ -6,7 +6,7 @@ import shutil
 import qdldl
 import numpy as np
 from scipy import sparse
-from qocogen.codegen_utils import *
+from qocogen.codegen_utils import write_license, write_Kelem
 
 
 def _generate_solver(
@@ -1772,7 +1772,7 @@ def generate_solver(solver_dir, m, Wsparse2dense, generate_ruiz):
     f.write("   }\n\n")
 
     # Initialize Ruiz data if Ruiz is disabled, since downstream functions use Druiz etc. so they should be set to all ones to prevent issues.
-    if generate_ruiz == False:
+    if not generate_ruiz:
         f.write("   for (int i = 0; i < work->n; ++i) {\n")
         f.write("       work->Druiz[i] = 1.0;\n")
         f.write("       work->Dinvruiz[i] = 1.0;\n")

@@ -3,7 +3,6 @@
 
 import numpy as np
 from scipy import sparse
-from types import SimpleNamespace
 from qocogen.codegen import _generate_solver
 import time
 
