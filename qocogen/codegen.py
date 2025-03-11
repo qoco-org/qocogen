@@ -410,6 +410,8 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     )
     f.write("void nt_multiply(double* W, double* x, double* z);\n")
     f.write("double linesearch(double* u, double* Du, double f, Workspace* work);\n")
+    f.write("double bisection_search(double* u, double* Du, double f, Workspace* work);\n")
+    f.write("double exact_linesearch(double* u, double* Du, double f, Workspace* work);\n")
     f.write("void compute_centering(Workspace* work);\n")
     f.write("#endif")
     f.close()
@@ -648,6 +650,15 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write("}\n\n")
 
     f.write("double linesearch(double* u, double* Du, double f, Workspace* work) {\n")
+    f.write("   if (work->nsoc == 0) {\n")
+    f.write("       return exact_linesearch(u, Du, f, work);\n")
+    f.write("   }\n")
+    f.write("   else {\n")
+    f.write("       return bisection_search(u, Du, f, work);\n")
+    f.write("   }\n")
+    f.write("}\n")
+
+    f.write("double bisection_search(double* u, double* Du, double f, Workspace* work) {\n")
     f.write("   double al = 0.0;\n")
     f.write("   double au = 1.0;\n")
     f.write("   double a = 0.0;\n")
@@ -665,6 +676,22 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write("   }\n")
     f.write("   return al;\n")
     f.write("}\n")
+
+    f.write("double exact_linesearch(double* u, double* Du, double f, Workspace* work) {\n")
+    f.write("   double a = 1.0;\n")
+    f.write("   double minval = 0;\n")
+    f.write("   // Compute a for LP cones.\n")
+    f.write("   for (int i = 0; i < work->l; ++i) {\n")
+    f.write("       if (Du[i] < minval * u[i])\n")
+    f.write("           minval = Du[i] / u[i];\n\n")
+    f.write("   }\n")
+    f.write("   if (-f < minval)\n")
+    f.write("       a = 1;\n")
+    f.write("   else\n")
+    f.write("       a = -f / minval;\n\n")
+    f.write("   return a;\n")
+    f.write("}\n")
+
 
     f.write("void compute_centering(Workspace* work) {\n")
     f.write(
