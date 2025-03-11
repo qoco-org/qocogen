@@ -1687,19 +1687,19 @@ def generate_utils(
         '   printf("| Solver Settings:                                      |\\n");\n'
     )
     f.write(
-        '   printf("|     max_iter: %-3d abstol: %3.2e reltol: %3.2e   |\\n", work->settings.max_iters, work->settings.abstol, work->settings.reltol);\n'
+        '   printf("|     max_iters: %-3d abstol: %3.2e reltol: %3.2e  |\\n", work->settings.max_iters, work->settings.abstol, work->settings.reltol);\n'
     )
     f.write(
         '   printf("|     abstol_inacc: %3.2e reltol_inacc: %3.2e     |\\n", work->settings.abstol_inacc, work->settings.reltol_inacc);\n'
     )
     f.write(
-        '   printf("|     bisect_iters: %-2d static_regularization: %3.2e  |\\n", work->settings.bisect_iters, work->settings.kkt_static_reg);\n'
+        '   printf("|     bisect_iters: %-2d iter_ref_iters: %-2d               |\\n", work->settings.bisect_iters, work->settings.iter_ref_iters);\n'
     )
     f.write(
-        '   printf("|     ruiz_iters: %-2d dynamic_regularization: %3.2e   |\\n", work->settings.ruiz_iters, work->settings.kkt_dynamic_reg);\n'
+        '   printf("|     ruiz_iters: %-2d kkt_static_reg: %3.2e           |\\n", work->settings.ruiz_iters, work->settings.kkt_static_reg);\n'
     )
     f.write(
-        '   printf("|     iterative_refine_iters: %-2d                        |\\n", work->settings.iter_ref_iters);\n'
+        '   printf("|     kkt_dynamic_reg: %3.2e                         |\\n", work->settings.kkt_dynamic_reg);\n'
     )
     f.write(
         '   printf("+-------------------------------------------------------+\\n");\n'
