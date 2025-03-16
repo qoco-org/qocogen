@@ -14,6 +14,19 @@ def _generate_solver(
 ):
     solver_dir = output_dir + "/" + name
 
+    # Need to handle case where 0 is in P.data, A.data, or G.data.
+    if P is not None:
+        for i in range(P.nnz):
+            if P.data[i] == 0:
+                P.data[i] += 1e-16
+    if A is not None:
+        for i in range(A.nnz):
+            if A.data[i] == 0:
+                A.data[i] += 1e-16
+    if G is not None:
+        for i in range(G.nnz):
+            if G.data[i] == 0:
+                G.data[i] += 1e-16
     print("\n")
     if os.path.exists(solver_dir):
         print("Removing existing solver.")
@@ -1674,7 +1687,7 @@ def generate_utils(
         '   printf("|              QOCO Custom Generated Solver             |\\n");\n'
     )
     f.write(
-        '   printf("|             (c) Govind M. Chari, 2024                 |\\n");\n'
+        '   printf("|             (c) Govind M. Chari, 2025                 |\\n");\n'
     )
     f.write(
         '   printf("|    University of Washington Autonomous Controls Lab   |\\n");\n'
