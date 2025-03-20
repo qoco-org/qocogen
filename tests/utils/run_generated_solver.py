@@ -6,7 +6,7 @@ def run_generated_solver(solver_dir):
     os.system(
         "cd "
         + solver_dir
-        + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && make && ./runtest && cd ../.."
+        + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && cmake --build . && ./runtest && cd ../.."
     )
     with open(solver_dir + "/build/result.bin", "rb") as file:
         # Read the unsigned int (4 bytes)
