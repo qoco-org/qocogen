@@ -151,7 +151,7 @@ def generate_cmakelists(solver_dir):
     f.write('if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")\n')
     f.write('   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra")\n')
     f.write("else()\n")
-    f.write("       add_compile_definitions(IS_WINDOWS)\n")
+    f.write("   add_compile_definitions(IS_WINDOWS)\n")
     f.write("   if(QOCO_CUSTOM_BUILD_TYPE STREQUAL Release)\n")
     f.write('       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Ox")\n')
     f.write("   endif()\n")
