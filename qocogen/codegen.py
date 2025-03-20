@@ -137,16 +137,28 @@ def generate_cmakelists(solver_dir):
     f.write("if(QOCO_CUSTOM_BUILD_TYPE STREQUAL Debug)\n")
     f.write("   set(QOCO_CUSTOM_BUILD_TYPE Debug)\n")
     f.write(
-        '   set(CMAKE_C_FLAGS "-g -march=native -Werror -Wall -Wextra -fsanitize=address,undefined")\n'
+        '   set(CMAKE_C_FLAGS "-g -Wall")\n'
     )
+    f.write('   if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")\n')
+    f.write('       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")\n')
+    f.write("   endif()\n")
     f.write("else()\n")
     f.write("   set(QOCO_CUSTOM_BUILD_TYPE Release)\n")
-    f.write('   set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n')
+    f.write('   set(CMAKE_C_FLAGS "-O3 -Wall")\n')
     f.write("endif()\n\n")
-    f.write('message(STATUS "Build Type: " ${QOCO_CUSTOM_BUILD_TYPE})\n')
-    f.write('message(STATUS "Build Flags: " ${CMAKE_C_FLAGS})\n')
 
-    f.write('set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n\n')
+    f.write('message(STATUS "We are on a ${CMAKE_SYSTEM_NAME} system")\n')
+    f.write('if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")\n')
+    f.write('   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra")\n')
+    f.write("else()\n")
+    f.write("   if(QOCO_CUSTOM_BUILD_TYPE STREQUAL Release)\n")
+    f.write('       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Ox")\n')
+    f.write("   endif()\n")
+    f.write("endif()\n")
+    f.write('message(STATUS "Build Type: " ${QOCO_CUSTOM_BUILD_TYPE})\n')
+    f.write('message(STATUS "Build Flags: " ${CMAKE_C_FLAGS})\n\n')
+
+    # f.write('set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n\n')
     f.write('set(qoco_custom_sources "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.c")\n\n')
     f.write('set(qoco_custom_headers "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.h")\n\n')
 
