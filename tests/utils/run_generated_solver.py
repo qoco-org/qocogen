@@ -7,7 +7,7 @@ def run_generated_solver(solver_dir):
         os.system(
             "cd "
             + solver_dir
-            + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && cmake --build . && runtest && cd ../.."
+            + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && cmake --build . && .\\runtest && cd ../.."
         )
     else:
         os.system(
