@@ -3,12 +3,22 @@ import struct
 
 
 def run_generated_solver(solver_dir):
-    os.system(
-        "cd "
-        + solver_dir
-        + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && make && ./runtest && cd ../.."
-    )
-    with open(solver_dir + "/build/result.bin", "rb") as file:
+    results = ""
+    if os.name == 'nt':
+        results = "/build/Debug/result.bin"
+        os.system(
+            "cd "
+            + solver_dir
+            + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && cmake --build . && cd Debug && .\\runtest.exe && cd ../.."
+        )
+    else:
+        results = "/build/result.bin"
+        os.system(
+            "cd "
+            + solver_dir
+            + " && mkdir build && cd build && cmake -DQOCO_CUSTOM_BUILD_TYPE:STR=Release .. && cmake --build . && ./runtest && cd ../.."
+        )
+    with open(solver_dir + results, "rb") as file:
         # Read the unsigned int (4 bytes)
         solved = struct.unpack("B", file.read(1))[0]
 
