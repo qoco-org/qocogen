@@ -168,19 +168,18 @@ def generate_cmakelists(solver_dir):
     f.write(
         "target_sources(qoco_custom PRIVATE ${qoco_custom_sources} ${qoco_custom_headers})\n"
     )
-    f.write("add_library(qoco_custom_static STATIC)\n")
-    f.write(
-        "target_sources(qoco_custom_static PRIVATE ${qoco_custom_sources} ${qoco_custom_headers})\n"
-    )
     f.write('if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")\n')
     f.write("   target_link_libraries(qoco_custom m)\n")
-    f.write("   target_link_libraries(qoco_custom_static m)\n")
     f.write("endif()\n\n")
     f.write("# Build qoco demo.\n")
     f.write("add_executable(runtest runtest.c)\n")
     f.write('if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")\n')
     f.write("   target_link_libraries(runtest qoco_custom)\n")
     f.write("else()\n")
+    f.write("   add_library(qoco_custom_static STATIC)\n")
+    f.write(
+        "   target_sources(qoco_custom_static PRIVATE ${qoco_custom_sources} ${qoco_custom_headers})\n"
+    )
     f.write("   target_link_libraries(runtest qoco_custom_static)\n")
     f.write("endif()\n\n")
 
