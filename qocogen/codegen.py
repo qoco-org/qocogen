@@ -144,7 +144,7 @@ def generate_cmakelists(solver_dir):
     f.write("   endif()\n")
     f.write("else()\n")
     f.write("   set(QOCO_CUSTOM_BUILD_TYPE Release)\n")
-    f.write('   set(CMAKE_C_FLAGS "-O3 -Wall")\n')
+    f.write('   set(CMAKE_C_FLAGS "-O3 -Wall -march=native")\n')
     f.write("endif()\n\n")
     f.write("# Detect OS.\n")
     f.write('message(STATUS "We are on a ${CMAKE_SYSTEM_NAME} system")\n')
@@ -159,7 +159,6 @@ def generate_cmakelists(solver_dir):
     f.write('message(STATUS "Build Type: " ${QOCO_CUSTOM_BUILD_TYPE})\n')
     f.write('message(STATUS "Build Flags: " ${CMAKE_C_FLAGS})\n\n')
 
-    # f.write('set(CMAKE_C_FLAGS "-O3 -march=native -Wall -Wextra")\n\n')
     f.write('set(qoco_custom_sources "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.c"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.c")\n\n')
     f.write('set(qoco_custom_headers "${CMAKE_CURRENT_SOURCE_DIR}/qoco_custom.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/cone.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/utils.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/ldl.h"\n\t"${CMAKE_CURRENT_SOURCE_DIR}/kkt.h")\n\n')
 
