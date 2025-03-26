@@ -1591,9 +1591,6 @@ def generate_utils(
     f.write("   qoco_custom_ew_product(work->Fruiz, work->s, work->ubuff1, work->m);\n")
     f.write("   double sinf = work->m > 0 ? qoco_custom_inf_norm(work->ubuff1, work->m) : 0;\n\n")
 
-    f.write("   qoco_custom_ew_product(work->Fruiz, work->s, work->ubuff2, work->m);\n")
-    f.write("   double zinf = work->p > 0 ? qoco_custom_inf_norm(work->ubuff2, work->m) : 0;\n\n")
-
     f.write("   qoco_custom_ew_product(work->Dinvruiz, work->x, work->xbuff, work->n);\n")
     f.write("   double cinf = work->n > 0 ? qoco_custom_inf_norm(work->xbuff, work->n) : 0;\n\n")
 
