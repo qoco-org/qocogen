@@ -71,8 +71,9 @@ def _generate_solver(
     L, D, perm = solver.factors()
 
     # Ensure that all elements of L.data are nonzero.
-    if L.nnz > 0:
-        L.data += 2 * np.max(np.abs(L.data))
+    for i in range(L.nnz):
+        if L.data[i] == 0:
+            L.data[i] += 1e-16
 
     # Generate Lidx which indicates which elements of L are nonzero.
     N = n + m + p
@@ -108,20 +109,6 @@ def _generate_solver(
         generate_ruiz,
     )
 
-    # Ensure that all elements of L.data, P.data, A.data, and G.data are nonzero.
-    # See TODO in write_Kelem()
-    # Ideally we can test if an index pair represents a structural nonzero, but a hack is
-    # to force all elements in data to be nonzero.
-    # This must be done after generate_utils, since generate_utils needs the correct numeric values of
-    # P, A, G for the load_data() function
-    if P is not None and P.nnz > 0:
-        P.data += 2 * np.max(np.abs(P.data))
-
-    if A is not None and A.nnz > 0:
-        A.data += 2 * np.max(np.abs(A.data))
-
-    if G is not None and G.nnz > 0:
-        G.data += 2 * np.max(np.abs(G.data))
     generate_ldl(solver_dir, n, m, p, P, A, G, perm, Lidx, Wsparse2dense)
     generate_solver(solver_dir, m, Wsparse2dense, generate_ruiz)
     generate_runtest(solver_dir)
@@ -188,8 +175,8 @@ def generate_cmakelists(solver_dir):
 def generate_workspace(solver_dir, n, m, p, P, c, A, b, G, h, q, Lnnz, Wnnz):
     f = open(solver_dir + "/workspace.h", "a")
     write_license(f)
-    f.write("#ifndef WORKSPACE_H\n")
-    f.write("#define WORKSPACE_H\n\n")
+    f.write("#ifndef QOCO_CUSTOM_WORKSPACE_H\n")
+    f.write("#define QOCO_CUSTOM_WORKSPACE_H\n\n")
 
     f.write("typedef struct {\n")
     f.write("   int max_iters;\n")
@@ -283,8 +270,8 @@ def generate_workspace(solver_dir, n, m, p, P, c, A, b, G, h, q, Lnnz, Wnnz):
 def generate_ldl(solver_dir, n, m, p, P, A, G, perm, Lidx, Wsparse2dense):
     f = open(solver_dir + "/ldl.h", "a")
     write_license(f)
-    f.write("#ifndef LDL_H\n")
-    f.write("#define LDL_H\n\n")
+    f.write("#ifndef QOCO_CUSTOM_LDL_H\n")
+    f.write("#define QOCO_CUSTOM_LDL_H\n\n")
     f.write('#include "kkt.h"\n')
     f.write('#include "utils.h"\n')
     f.write('#include "workspace.h"\n\n')
@@ -383,7 +370,7 @@ def generate_ldl(solver_dir, n, m, p, P, A, G, perm, Lidx, Wsparse2dense):
     f.write("       work->xyz[j] = work->kkt_rhs[work->perm[j]];\n")
     f.write("   }\n")
     f.write(
-        "   copy_arrayf(work->xyz, work->kkt_rhs, work->n + work->p + work->m);\n\n"
+        "   qoco_custom_copy_arrayf(work->xyz, work->kkt_rhs, work->n + work->p + work->m);\n\n"
     )
 
     f.write("   // Solve xyzbuff = K \\ xyz.\n")
@@ -397,14 +384,14 @@ def generate_ldl(solver_dir, n, m, p, P, A, G, perm, Lidx, Wsparse2dense):
     f.write("           work->xyz[j] = work->kkt_rhs[j] - work->xyz[j];\n")
     f.write("       }\n")
     f.write(
-        "       copy_arrayf(work->xyzbuff, work->xyzbuff2, work->n + work->m + work->p);\n"
+        "       qoco_custom_copy_arrayf(work->xyzbuff, work->xyzbuff2, work->n + work->m + work->p);\n"
     )
     f.write("       tri_solve(work);\n")
     f.write(
-        "       axpy(work->xyzbuff2, work->xyzbuff, work->xyz, 1.0, work->n + work->m + work->p);\n"
+        "       qoco_custom_axpy(work->xyzbuff2, work->xyzbuff, work->xyz, 1.0, work->n + work->m + work->p);\n"
     )
     f.write(
-        "       copy_arrayf(work->xyz, work->xyzbuff, work->n + work->m + work->p);\n"
+        "       qoco_custom_copy_arrayf(work->xyz, work->xyzbuff, work->n + work->m + work->p);\n"
     )
     f.write("   }\n")
     f.write("   // Permute xyzbuff and store in xyz.\n")
@@ -420,8 +407,8 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     # Write header.
     f = open(solver_dir + "/cone.h", "a")
     write_license(f)
-    f.write("#ifndef CONE_H\n")
-    f.write("#define CONE_H\n\n")
+    f.write("#ifndef QOCO_CUSTOM_CONE_H\n")
+    f.write("#define QOCO_CUSTOM_CONE_H\n\n")
     f.write('#include "utils.h"\n\n')
 
     f.write("void soc_product(double* u, double* v, double* p, int n);\n")
@@ -457,18 +444,18 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write('#include "cone.h"\n\n')
 
     f.write("void soc_product(double* u, double* v, double* p, int n) {\n")
-    f.write("   p[0] = dot(u, v, n);\n")
+    f.write("   p[0] = qoco_custom_dot(u, v, n);\n")
     f.write("   for (int i = 1; i < n; ++i) {\n")
     f.write("       p[i] = u[0] * v[i] + v[0] * u[i];\n")
     f.write("   }\n")
     f.write("}\n\n")
 
     f.write("void soc_division(double* lam, double* v, double* d, int n) {\n")
-    f.write("   double f = lam[0] * lam[0] - dot(&lam[1], &lam[1], n - 1);\n")
+    f.write("   double f = lam[0] * lam[0] - qoco_custom_dot(&lam[1], &lam[1], n - 1);\n")
     f.write("   double finv = safe_div(1.0, f);\n")
     f.write("   double lam0inv = safe_div(1.0, lam[0]);\n")
-    f.write("   double lam1dv1 = dot(&lam[1], &v[1], n - 1);\n")
-    f.write("   d[0] = finv * (lam[0] * v[0] - dot(&lam[1], &v[1], n - 1));\n")
+    f.write("   double lam1dv1 = qoco_custom_dot(&lam[1], &v[1], n - 1);\n")
+    f.write("   d[0] = finv * (lam[0] * v[0] - qoco_custom_dot(&lam[1], &v[1], n - 1));\n")
     f.write("   for (int i = 1; i < n; ++i) {\n")
     f.write(
         "       d[i] = finv * (-lam[i] * v[0] + lam0inv * f * v[i] + lam0inv * lam1dv1 * lam[i]);\n"
@@ -560,7 +547,7 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     if m == 0:
         f.write("   work->mu = 0.0;\n")
     else:
-        f.write("   work->mu = (dot(work->s, work->z, work->m) / work->m);\n")
+        f.write("   work->mu = (qoco_custom_dot(work->s, work->z, work->m) / work->m);\n")
     f.write("}\n\n")
 
     f.write("void compute_nt_scaling(Workspace* work) {\n")
@@ -579,15 +566,15 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write("       double s_scal = soc_residual2(&work->s[idx], work->q[i]);\n")
     f.write("       s_scal = qoco_sqrt(s_scal);\n")
     f.write("       double f = safe_div(1.0, s_scal);\n")
-    f.write("       scale_arrayf(&work->s[idx], work->sbar, f, work->q[i]);\n\n")
+    f.write("       qoco_custom_scale_arrayf(&work->s[idx], work->sbar, f, work->q[i]);\n\n")
 
     f.write("       double z_scal = soc_residual2(&work->z[idx], work->q[i]);\n")
     f.write("       z_scal = qoco_sqrt(z_scal);\n")
     f.write("       f = safe_div(1.0, z_scal);\n")
-    f.write("       scale_arrayf(&work->z[idx], work->zbar, f, work->q[i]);\n\n")
+    f.write("       qoco_custom_scale_arrayf(&work->z[idx], work->zbar, f, work->q[i]);\n\n")
 
     f.write(
-        "       double gamma = qoco_sqrt(0.5 * (1 + dot(work->sbar, work->zbar, work->q[i])));\n"
+        "       double gamma = qoco_sqrt(0.5 * (1 + qoco_custom_dot(work->sbar, work->zbar, work->q[i])));\n"
     )
     f.write("       f = safe_div(1.0, (2 * gamma));\n\n")
     f.write("       // Overwrite sbar with wbar.\n")
@@ -699,7 +686,7 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write("   double a = 0.0;\n")
     f.write("   for (int i = 0; i < work->settings.bisect_iters; ++i) {\n")
     f.write("       a = 0.5 * (al + au);\n")
-    f.write("       axpy(Du, u, work->ubuff1, safe_div(a, f), work->m);\n")
+    f.write("       qoco_custom_axpy(Du, u, work->ubuff1, safe_div(a, f), work->m);\n")
     f.write(
         "       if (cone_residual(work->ubuff1, work->l, work->nsoc, work->q) >= 0) {\n"
     )
@@ -733,11 +720,11 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
         "   double a = qoco_min(linesearch(work->z, &work->xyz[work->n + work->p], 1.0, work), linesearch(work->s, work->Ds, 1.0, work));\n"
     )
     f.write(
-        "   axpy(&work->xyz[work->n + work->p], work->z, work->ubuff1, a, work->m);\n"
+        "   qoco_custom_axpy(&work->xyz[work->n + work->p], work->z, work->ubuff1, a, work->m);\n"
     )
-    f.write("   axpy(work->Ds, work->s, work->ubuff2, a, work->m);\n")
+    f.write("   qoco_custom_axpy(work->Ds, work->s, work->ubuff2, a, work->m);\n")
     f.write(
-        "   double rho = safe_div(dot(work->ubuff1, work->ubuff2, work->m), dot(work->z, work->s, work->m));\n"
+        "   double rho = safe_div(qoco_custom_dot(work->ubuff1, work->ubuff2, work->m), qoco_custom_dot(work->z, work->s, work->m));\n"
     )
     f.write("   double sigma = qoco_min(1.0, rho);\n")
     f.write("   sigma = qoco_max(0.0, sigma);\n")
@@ -753,8 +740,8 @@ def generate_kkt(
     # Write header.
     f = open(solver_dir + "/kkt.h", "a")
     write_license(f)
-    f.write("#ifndef KKT_H\n")
-    f.write("#define KKT_H\n\n")
+    f.write("#ifndef QOCO_CUSTOM_KKT_H\n")
+    f.write("#define QOCO_CUSTOM_KKT_H\n\n")
     f.write('#include "cone.h"\n')
     f.write('#include "ldl.h"\n')
     f.write('#include "workspace.h"\n\n')
@@ -809,7 +796,7 @@ def generate_kkt(
         f.write("           g += work->xbuff[i];\n")
         f.write("       }\n")
         f.write("       g /= work->n;\n")
-        f.write("       double cinf = inf_norm(work->c, work->n);\n")
+        f.write("       double cinf = qoco_custom_inf_norm(work->c, work->n);\n")
         f.write("       g = qoco_max(g, cinf);\n")
         f.write("       g = safe_div(1.0, g);\n")
         f.write("       work->k *= g;\n\n")
@@ -827,31 +814,31 @@ def generate_kkt(
         f.write("       }\n\n")
 
         f.write("       // Scale P by g.\n")
-        f.write("       scale_arrayf(work->P, work->P, g, work->Pnnz);\n")
+        f.write("       qoco_custom_scale_arrayf(work->P, work->P, g, work->Pnnz);\n")
 
         f.write("       // Scale c.\n")
-        f.write("       scale_arrayf(work->c, work->c, g, work->n);\n")
-        f.write("       ew_product(work->c, work->xyzbuff, work->c, work->n);\n\n")
+        f.write("       qoco_custom_scale_arrayf(work->c, work->c, g, work->n);\n")
+        f.write("       qoco_custom_ew_product(work->c, work->xyzbuff, work->c, work->n);\n\n")
 
         f.write("       // Scale P, A, G.\n")
         f.write("       ruiz_scale_KKT(work->xyzbuff, work);\n\n")
 
         f.write("       // Update scaling matrices.\n")
         f.write(
-            "       ew_product(work->Druiz, work->xyzbuff, work->Druiz, work->n);\n"
+            "       qoco_custom_ew_product(work->Druiz, work->xyzbuff, work->Druiz, work->n);\n"
         )
         f.write(
-            "       ew_product(work->Eruiz, &work->xyzbuff[work->n], work->Eruiz, work->p);\n"
+            "       qoco_custom_ew_product(work->Eruiz, &work->xyzbuff[work->n], work->Eruiz, work->p);\n"
         )
         f.write(
-            "       ew_product(work->Fruiz, &work->xyzbuff[work->n + work->p], work->Fruiz, work->m);\n"
+            "       qoco_custom_ew_product(work->Fruiz, &work->xyzbuff[work->n + work->p], work->Fruiz, work->m);\n"
         )
         f.write("   }\n")
         f.write("   // Scale b.\n")
-        f.write("   ew_product(work->b, work->Eruiz, work->b, work->p);\n\n")
+        f.write("   qoco_custom_ew_product(work->b, work->Eruiz, work->b, work->p);\n\n")
 
         f.write("   // Scale h.\n")
-        f.write("   ew_product(work->h, work->Fruiz, work->h, work->m);\n\n")
+        f.write("   qoco_custom_ew_product(work->h, work->Fruiz, work->h, work->m);\n\n")
 
         f.write("   // Compute Dinv, Einv, Finv.\n")
         f.write("   work->kinv = safe_div(1.0, work->k);\n")
@@ -867,17 +854,17 @@ def generate_kkt(
         f.write("}\n\n")
 
         f.write("void unequilibrate_data(Workspace* work) {\n")
-        f.write("   copy_arrayf(work->Dinvruiz, work->xyzbuff, work->n);\n")
-        f.write("   copy_arrayf(work->Einvruiz, &work->xyzbuff[work->n], work->p);\n")
+        f.write("   qoco_custom_copy_arrayf(work->Dinvruiz, work->xyzbuff, work->n);\n")
+        f.write("   qoco_custom_copy_arrayf(work->Einvruiz, &work->xyzbuff[work->n], work->p);\n")
         f.write(
-            "   copy_arrayf(work->Finvruiz, &work->xyzbuff[work->n + work->p], work->m);\n"
+            "   qoco_custom_copy_arrayf(work->Finvruiz, &work->xyzbuff[work->n + work->p], work->m);\n"
         )
         f.write("   ruiz_scale_KKT(work->xyzbuff, work);\n")
-        f.write("   scale_arrayf(work->P, work->P, work->kinv, work->Pnnz);\n")
-        f.write("   scale_arrayf(work->c, work->c, work->kinv, work->n);\n")
-        f.write("   ew_product(work->c, work->Dinvruiz, work->c, work->n);\n")
-        f.write("   ew_product(work->b, work->Einvruiz, work->b, work->p);\n")
-        f.write("   ew_product(work->h, work->Finvruiz, work->h, work->m);\n")
+        f.write("   qoco_custom_scale_arrayf(work->P, work->P, work->kinv, work->Pnnz);\n")
+        f.write("   qoco_custom_scale_arrayf(work->c, work->c, work->kinv, work->n);\n")
+        f.write("   qoco_custom_ew_product(work->c, work->Dinvruiz, work->c, work->n);\n")
+        f.write("   qoco_custom_ew_product(work->b, work->Einvruiz, work->b, work->p);\n")
+        f.write("   qoco_custom_ew_product(work->h, work->Finvruiz, work->h, work->m);\n")
         f.write("}\n\n")
 
     f.write("void KKT_perm_product(double* x, double* y, Workspace* work) {\n")
@@ -934,7 +921,7 @@ def generate_kkt(
     # f.write("   for (int i = 0; i < work->n + work->m + work->p; ++i) {\n")
     # f.write("       work->xyzbuff2[i] = work->xyzbuff[i] - y[i];\n")
     # f.write("   }\n")
-    # f.write("   double res = inf_norm(work->xyzbuff2, work->n + work->m + work->p);\n")
+    # f.write("   double res = qoco_custom_inf_norm(work->xyzbuff2, work->n + work->m + work->p);\n")
     # f.write("   return res;\n")
     # f.write("}\n")
 
@@ -1025,7 +1012,7 @@ def generate_kkt(
     f.write("   ldl(work);\n\n")
     f.write("   // Construct rhs for affine scaling direction.\n")
     f.write("   construct_kkt_aff_rhs(work);\n\n")
-    # f.write("   copy_arrayf(work->kkt_rhs, work->xyzbuff3, work->n + work->m + work->p);\n")
+    # f.write("   qoco_custom_copy_arrayf(work->kkt_rhs, work->xyzbuff3, work->n + work->m + work->p);\n")
     f.write("   // Solve KKT system to get affine scaling direction.\n")
     f.write("   kkt_solve(work);\n\n")
     # f.write("   double res = kkt_solve_verify(work, work->xyz, work->xyzbuff3);\n")
@@ -1101,8 +1088,8 @@ def generate_utils(
     # Write header.
     f = open(solver_dir + "/utils.h", "a")
     write_license(f)
-    f.write("#ifndef UTILS_H\n")
-    f.write("#define UTILS_H\n\n")
+    f.write("#ifndef QOCO_CUSTOM_UTILS_H\n")
+    f.write("#define QOCO_CUSTOM_UTILS_H\n\n")
     f.write('#include "workspace.h"\n\n')
     f.write("#define qoco_abs(x) ((x)<0 ? -(x) : (x))\n")
     f.write("#define safe_div(a, b) (qoco_abs(a) > 1e-15) ? (a / b) : 1e16\n")
@@ -1136,22 +1123,22 @@ def generate_utils(
 
     f.write("void load_data(Workspace* work);\n")
     f.write("void set_default_settings(Workspace* work);\n")
-    f.write("void copy_arrayf(double* x, double* y, int n);\n")
+    f.write("void qoco_custom_copy_arrayf(double* x, double* y, int n);\n")
     f.write("void copy_and_negate_arrayf(double* x, double* y, int n);\n")
-    f.write("double dot(double* x, double* y, int n);\n")
-    f.write("double inf_norm(double* x, int n);\n")
+    f.write("double qoco_custom_dot(double* x, double* y, int n);\n")
+    f.write("double qoco_custom_inf_norm(double* x, int n);\n")
     if generate_ruiz:
         f.write("void KKTrow_inf_norm(double* norm, Workspace* work);\n")
         f.write("void ruiz_scale_KKT(double* d, Workspace* work);\n")
         f.write("void Pinf_norm(double* norm, Workspace* work);\n")
-    f.write("void Px(double* x, double* y, Workspace* work);\n")
-    f.write("void Ax(double* x, double* y, Workspace* work);\n")
+    f.write("void qoco_custom_qoco_custom_Px(double* x, double* y, Workspace* work);\n")
+    f.write("void qoco_custom_Ax(double* x, double* y, Workspace* work);\n")
     f.write("void Gx(double* x, double* y, Workspace* work);\n")
     f.write("void Atx(double* x, double* y, Workspace* work);\n")
     f.write("void Gtx(double* x, double* y, Workspace* work);\n")
-    f.write("void scale_arrayf(double* x, double* y, double s, int n);\n")
-    f.write("void ew_product(double* x, double* y, double* z, int n);\n")
-    f.write("void axpy(double* x, double* y, double* z, double a, int n);\n")
+    f.write("void qoco_custom_scale_arrayf(double* x, double* y, double s, int n);\n")
+    f.write("void qoco_custom_ew_product(double* x, double* y, double* z, int n);\n")
+    f.write("void qoco_custom_axpy(double* x, double* y, double* z, double a, int n);\n")
     f.write("unsigned char check_stopping(Workspace* work);\n")
     f.write("void copy_solution(Workspace* work);\n")
     f.write("void unscale_solution(Workspace* work);\n")
@@ -1278,7 +1265,7 @@ def generate_utils(
     f.write("   work->settings.verbose = 0;\n")
     f.write("}\n\n")
 
-    f.write("void copy_arrayf(double* x, double* y, int n) {\n")
+    f.write("void qoco_custom_copy_arrayf(double* x, double* y, int n) {\n")
     f.write("   for (int i = 0; i < n; ++i) {\n")
     f.write("      y[i] = x[i];\n")
     f.write("   }\n")
@@ -1290,7 +1277,7 @@ def generate_utils(
     f.write("   }\n")
     f.write("}\n\n")
 
-    f.write("double dot(double* x, double* y, int n) {\n")
+    f.write("double qoco_custom_dot(double* x, double* y, int n) {\n")
     f.write("   double ans = 0;\n")
     f.write("      for (int i = 0; i < n; ++i) {\n")
     f.write("         ans += x[i] * y[i];\n")
@@ -1298,7 +1285,7 @@ def generate_utils(
     f.write("   return ans;\n")
     f.write("}\n\n")
 
-    f.write("double inf_norm(double* x, int n) {\n")
+    f.write("double qoco_custom_inf_norm(double* x, int n) {\n")
     f.write("   double norm = 0.0;\n")
     f.write("   double xi;\n")
     f.write("   for (int i = 0; i < n; ++i) {\n")
@@ -1428,7 +1415,7 @@ def generate_utils(
                     f.write("));\n")
         f.write("}\n")
 
-    f.write("void Px(double* x, double* y, Workspace* work) {\n")
+    f.write("void qoco_custom_Px(double* x, double* y, Workspace* work) {\n")
     for i in range(n):
         f.write("   y[%i] = " % i)
         for j in range(n):
@@ -1452,7 +1439,7 @@ def generate_utils(
         f.write("0;\n")
     f.write("}\n\n")
 
-    f.write("void Ax(double* x, double* y, Workspace* work) {\n")
+    f.write("void qoco_custom_Ax(double* x, double* y, Workspace* work) {\n")
     for i in range(p):
         f.write("   y[%i] = " % i)
         for j in range(n):
@@ -1548,19 +1535,19 @@ def generate_utils(
         f.write("0;\n")
     f.write("}\n\n")
 
-    f.write("void scale_arrayf(double* x, double* y, double s, int n) {\n")
+    f.write("void qoco_custom_scale_arrayf(double* x, double* y, double s, int n) {\n")
     f.write("   for (int i = 0; i < n; ++i) {\n")
     f.write("       y[i] = s * x[i];\n")
     f.write("   }\n")
     f.write("}\n\n")
 
-    f.write("void ew_product(double* x, double* y, double* z, int n) {\n")
+    f.write("void qoco_custom_ew_product(double* x, double* y, double* z, int n) {\n")
     f.write("   for (int i = 0; i < n; ++i) {\n")
     f.write("       z[i] = x[i] * y[i];\n")
     f.write("   }\n")
     f.write("}\n")
 
-    f.write("void axpy(double* x, double* y, double* z, double a, int n) {\n")
+    f.write("void qoco_custom_axpy(double* x, double* y, double* z, double a, int n) {\n")
     f.write("   for (int i = 0; i < n; ++i) {\n")
     f.write("       z[i] = a * x[i] + y[i];\n")
     f.write("   }\n")
@@ -1568,86 +1555,86 @@ def generate_utils(
 
     f.write("unsigned char check_stopping(Workspace* work) {\n")
     f.write("   // Compute objective.\n")
-    f.write("   double obj = dot(work->c, work->x, work->n);\n")
-    f.write("   Px(work->x, work->xbuff, work);\n")
-    f.write("   double xPx = dot(work->x, work->xbuff, work->n);\n")
-    f.write("   obj += 0.5 * dot(work->x, work->xbuff, work->n);\n")
+    f.write("   double obj = qoco_custom_dot(work->c, work->x, work->n);\n")
+    f.write("   qoco_custom_Px(work->x, work->xbuff, work);\n")
+    f.write("   double xqoco_custom_Px = qoco_custom_dot(work->x, work->xbuff, work->n);\n")
+    f.write("   obj += 0.5 * qoco_custom_dot(work->x, work->xbuff, work->n);\n")
     f.write("   work->sol.obj = obj * work->kinv;\n")
-    f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
-    f.write("   double Pxinf = inf_norm(work->xbuff, work->n);\n\n")
+    f.write("   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
+    f.write("   double qoco_custom_Pxinf = qoco_custom_inf_norm(work->xbuff, work->n);\n\n")
 
     f.write("   // Compute primal residual, dual residual, and duality gap.\n")
 
     f.write(
-        "   ew_product(&work->kkt_res[work->n], work->Einvruiz, work->xbuff, work->p);\n"
+        "   qoco_custom_ew_product(&work->kkt_res[work->n], work->Einvruiz, work->xbuff, work->p);\n"
     )
-    f.write("   double eq_res = inf_norm(work->xbuff, work->p);\n")
+    f.write("   double eq_res = qoco_custom_inf_norm(work->xbuff, work->p);\n")
     f.write(
-        "   ew_product(&work->kkt_res[work->n + work->p], work->Finvruiz, work->ubuff1, work->m);\n"
+        "   qoco_custom_ew_product(&work->kkt_res[work->n + work->p], work->Finvruiz, work->ubuff1, work->m);\n"
     )
-    f.write("   double conic_res = inf_norm(work->ubuff1, work->m);\n")
+    f.write("   double conic_res = qoco_custom_inf_norm(work->ubuff1, work->m);\n")
     f.write("   double pres = qoco_max(eq_res, conic_res);\n")
-    f.write("   ew_product(work->kkt_res, work->Dinvruiz, work->xbuff, work->n);\n")
-    f.write("   scale_arrayf(work->xbuff, work->xbuff, work->kinv, work->n);\n")
-    f.write("   double dres = inf_norm(work->xbuff, work->n);\n")
+    f.write("   qoco_custom_ew_product(work->kkt_res, work->Dinvruiz, work->xbuff, work->n);\n")
+    f.write("   qoco_custom_scale_arrayf(work->xbuff, work->xbuff, work->kinv, work->n);\n")
+    f.write("   double dres = qoco_custom_inf_norm(work->xbuff, work->n);\n")
     f.write("   work->sol.pres = pres;\n")
     f.write("   work->sol.dres = dres;\n\n")
-    f.write("   ew_product(work->s, work->Fruiz, work->ubuff1, work->m);\n")
-    f.write("   ew_product(work->z, work->Fruiz, work->ubuff2, work->m);\n")
-    f.write("   double gap = dot(work->ubuff1, work->ubuff2, work->m);\n")
+    f.write("   qoco_custom_ew_product(work->s, work->Fruiz, work->ubuff1, work->m);\n")
+    f.write("   qoco_custom_ew_product(work->z, work->Fruiz, work->ubuff2, work->m);\n")
+    f.write("   double gap = qoco_custom_dot(work->ubuff1, work->ubuff2, work->m);\n")
     f.write("   gap *= work->kinv;\n")
     f.write("   work->sol.gap = gap;\n\n")
 
-    f.write("   ew_product(work->Einvruiz, work->b, work->xbuff, work->p);\n")
-    f.write("   double binf = work->p > 0 ? inf_norm(work->xbuff, work->p) : 0;\n\n")
+    f.write("   qoco_custom_ew_product(work->Einvruiz, work->b, work->xbuff, work->p);\n")
+    f.write("   double binf = work->p > 0 ? qoco_custom_inf_norm(work->xbuff, work->p) : 0;\n\n")
 
-    f.write("   ew_product(work->Fruiz, work->s, work->ubuff1, work->m);\n")
-    f.write("   double sinf = work->m > 0 ? inf_norm(work->ubuff1, work->m) : 0;\n\n")
+    f.write("   qoco_custom_ew_product(work->Fruiz, work->s, work->ubuff1, work->m);\n")
+    f.write("   double sinf = work->m > 0 ? qoco_custom_inf_norm(work->ubuff1, work->m) : 0;\n\n")
 
-    f.write("   ew_product(work->Fruiz, work->s, work->ubuff2, work->m);\n")
-    f.write("   double zinf = work->p > 0 ? inf_norm(work->ubuff2, work->m) : 0;\n\n")
+    f.write("   qoco_custom_ew_product(work->Fruiz, work->s, work->ubuff2, work->m);\n")
+    f.write("   double zinf = work->p > 0 ? qoco_custom_inf_norm(work->ubuff2, work->m) : 0;\n\n")
 
-    f.write("   ew_product(work->Dinvruiz, work->x, work->xbuff, work->n);\n")
-    f.write("   double cinf = work->n > 0 ? inf_norm(work->xbuff, work->n) : 0;\n\n")
+    f.write("   qoco_custom_ew_product(work->Dinvruiz, work->x, work->xbuff, work->n);\n")
+    f.write("   double cinf = work->n > 0 ? qoco_custom_inf_norm(work->xbuff, work->n) : 0;\n\n")
 
-    f.write("   ew_product(work->Finvruiz, work->h, work->ubuff3, work->m);\n")
-    f.write("   double hinf = work->m > 0 ? inf_norm(work->ubuff3, work->m) : 0;\n\n")
+    f.write("   qoco_custom_ew_product(work->Finvruiz, work->h, work->ubuff3, work->m);\n")
+    f.write("   double hinf = work->m > 0 ? qoco_custom_inf_norm(work->ubuff3, work->m) : 0;\n\n")
 
     f.write("   Gtx(work->z, work->xbuff, work);\n")
-    f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
-    f.write("   double Gtzinf = inf_norm(work->xbuff, work->n);\n\n")
+    f.write("   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
+    f.write("   double Gtzinf = qoco_custom_inf_norm(work->xbuff, work->n);\n\n")
 
     f.write("   Atx(work->y, work->xbuff, work);\n")
-    f.write("   ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
-    f.write("   double Atyinf = inf_norm(work->xbuff, work->n);\n\n")
+    f.write("   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);\n")
+    f.write("   double Atyinf = qoco_custom_inf_norm(work->xbuff, work->n);\n\n")
 
     f.write("   Gx(work->x, work->ubuff1, work);\n")
-    f.write("   ew_product(work->ubuff1, work->Finvruiz, work->ubuff1, work->m);\n")
+    f.write("   qoco_custom_ew_product(work->ubuff1, work->Finvruiz, work->ubuff1, work->m);\n")
 
-    f.write("   double Gxinf = inf_norm(work->ubuff1, work->m);\n")
+    f.write("   double Gxinf = qoco_custom_inf_norm(work->ubuff1, work->m);\n")
     # Using xbuff instead of adding a ybuff, since n >= p
-    f.write("   Ax(work->x, work->xbuff, work);\n")
-    f.write("   ew_product(work->xbuff, work->Einvruiz, work->xbuff, work->p);\n")
-    f.write("   double Axinf = inf_norm(work->xbuff, work->p);\n\n")
+    f.write("   qoco_custom_Ax(work->x, work->xbuff, work);\n")
+    f.write("   qoco_custom_ew_product(work->xbuff, work->Einvruiz, work->xbuff, work->p);\n")
+    f.write("   double Axinf = qoco_custom_inf_norm(work->xbuff, work->p);\n\n")
 
     f.write("   // Compute max{Axinf, binf, Gxinf, hinf, sinf}.\n")
     f.write("   double pres_rel = qoco_max(Axinf, binf);\n")
     f.write("   pres_rel = qoco_max(pres_rel, Gxinf);\n")
     f.write("   pres_rel = qoco_max(pres_rel, hinf);\n")
     f.write("   pres_rel = qoco_max(pres_rel, sinf);\n\n")
-    f.write("   // Compute max{Pxinf, Atyinf, Gtzinf, cinf}.\n")
-    f.write("   double dres_rel = qoco_max(Pxinf, Atyinf);\n")
+    f.write("   // Compute max{qoco_custom_Pxinf, Atyinf, Gtzinf, cinf}.\n")
+    f.write("   double dres_rel = qoco_max(qoco_custom_Pxinf, Atyinf);\n")
     f.write("   dres_rel = qoco_max(dres_rel, Gtzinf);\n")
     f.write("   dres_rel = qoco_max(dres_rel, cinf);\n")
     f.write("   dres_rel *= work->kinv;\n")
 
     f.write("   // Compute max{sinf, zinf}.\n")
-    f.write("   double ctx = dot(work->c, work->x, work->n);\n")
-    f.write("   double bty = dot(work->b, work->y, work->p);\n")
-    f.write("   double htz = dot(work->h, work->z, work->m);\n\n")
+    f.write("   double ctx = qoco_custom_dot(work->c, work->x, work->n);\n")
+    f.write("   double bty = qoco_custom_dot(work->b, work->y, work->p);\n")
+    f.write("   double htz = qoco_custom_dot(work->h, work->z, work->m);\n\n")
 
-    f.write("   double pobj = 0.5 * xPx + ctx;\n")
-    f.write("   double dobj = -0.5 * xPx - bty - htz;\n")
+    f.write("   double pobj = 0.5 * xqoco_custom_Px + ctx;\n")
+    f.write("   double dobj = -0.5 * xqoco_custom_Px - bty - htz;\n")
     f.write("   pobj = qoco_abs(pobj);\n")
     f.write("   dobj = qoco_abs(dobj);\n\n")
 
@@ -1680,19 +1667,19 @@ def generate_utils(
     f.write("}\n\n")
 
     f.write("void copy_solution(Workspace* work) {\n")
-    f.write("   copy_arrayf(work->x, work->sol.x, work->n);\n")
-    f.write("   copy_arrayf(work->s, work->sol.s, work->m);\n")
-    f.write("   copy_arrayf(work->y, work->sol.y, work->p);\n")
-    f.write("   copy_arrayf(work->z, work->sol.z, work->m);\n")
+    f.write("   qoco_custom_copy_arrayf(work->x, work->sol.x, work->n);\n")
+    f.write("   qoco_custom_copy_arrayf(work->s, work->sol.s, work->m);\n")
+    f.write("   qoco_custom_copy_arrayf(work->y, work->sol.y, work->p);\n")
+    f.write("   qoco_custom_copy_arrayf(work->z, work->sol.z, work->m);\n")
     f.write("}\n\n")
 
     f.write("void unscale_solution(Workspace* work) {\n")
-    f.write("   ew_product(work->x, work->Druiz, work->x, work->n);\n")
-    f.write("   ew_product(work->s, work->Finvruiz, work->s, work->m);\n")
-    f.write("   ew_product(work->y, work->Eruiz, work->y, work->p);\n")
-    f.write("   scale_arrayf(work->y, work->y, work->kinv, work->p);\n")
-    f.write("   ew_product(work->z, work->Fruiz, work->z, work->m);\n")
-    f.write("   scale_arrayf(work->z, work->z, work->kinv, work->m);\n")
+    f.write("   qoco_custom_ew_product(work->x, work->Druiz, work->x, work->n);\n")
+    f.write("   qoco_custom_ew_product(work->s, work->Finvruiz, work->s, work->m);\n")
+    f.write("   qoco_custom_ew_product(work->y, work->Eruiz, work->y, work->p);\n")
+    f.write("   qoco_custom_scale_arrayf(work->y, work->y, work->kinv, work->p);\n")
+    f.write("   qoco_custom_ew_product(work->z, work->Fruiz, work->z, work->m);\n")
+    f.write("   qoco_custom_scale_arrayf(work->z, work->z, work->kinv, work->m);\n")
     f.write("}\n")
 
     Pnnz = len(P.data) if P is not None else 0
@@ -1792,7 +1779,7 @@ def generate_utils(
     f.write("void log_iter(Workspace* work) {\n")
     f.write("#ifndef DISABLE_PRINTING\n")
     f.write(
-        'printf("|   %2d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |   %.3f   |\\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->a);'
+        'printf("|   %2d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |   %.3f   |\\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->a);\n'
     )
     f.write(
         'printf("+--------+-----------+------------+------------+------------+-----------+-----------+\\n");'
@@ -1864,9 +1851,9 @@ def generate_solver(solver_dir, m, Wsparse2dense, generate_ruiz):
     f.write("   }\n\n")
     f.write("   ldl(work);\n")
     f.write("   kkt_solve(work);\n")
-    f.write("   copy_arrayf(work->xyz, work->x, work->n);\n")
-    f.write("   copy_arrayf(&work->xyz[work->n], work->y, work->p);\n")
-    f.write("   copy_arrayf(&work->xyz[work->n + work->p], work->z, work->m);\n")
+    f.write("   qoco_custom_copy_arrayf(work->xyz, work->x, work->n);\n")
+    f.write("   qoco_custom_copy_arrayf(&work->xyz[work->n], work->y, work->p);\n")
+    f.write("   qoco_custom_copy_arrayf(&work->xyz[work->n + work->p], work->z, work->m);\n")
     f.write(
         "   copy_and_negate_arrayf(&work->xyz[work->n + work->p], work->s, work->m);\n"
     )
@@ -1924,7 +1911,7 @@ def generate_runtest(solver_dir):
     f.write("int main() {\n")
     f.write("   Workspace work;\n")
     f.write("   set_default_settings(&work);\n")
-    f.write("   work.settings.verbose = 0;\n")
+    f.write("   work.settings.verbose = 1;\n")
     f.write("   double N = 1000;\n")
     f.write("   double solve_time_sec = 1e10;\n")
     f.write("   for (int i = 0; i < N; ++i) {\n")
