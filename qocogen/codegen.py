@@ -708,7 +708,7 @@ def generate_cone(solver_dir, m, Wnnz, Wsparse2dense):
     f.write("           minval = Du[i] / u[i];\n\n")
     f.write("   }\n")
     f.write("   if (-f < minval)\n")
-    f.write("       a = 1;\n")
+    f.write("       a = 0.99;\n")
     f.write("   else\n")
     f.write("       a = -f / minval;\n\n")
     f.write("   return a;\n")
