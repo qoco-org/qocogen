@@ -6,7 +6,7 @@ import shutil
 import qdldl
 import numpy as np
 from scipy import sparse
-from qocogen.codegen_utils import write_license, write_Kelem, declare_array
+from qocogen.codegen_utils import write_license, write_Kelem, declare_array, write_license_file
 
 
 def _generate_solver(
@@ -83,6 +83,7 @@ def _generate_solver(
             if L[i, j] != 0.0:
                 Lidx[j * N + i] = True
 
+    write_license_file(solver_dir)
     generate_cmakelists(solver_dir)
     generate_workspace(solver_dir, n, m, p, P, c, A, b, G, h, q, L.nnz, Wnnz)
     generate_cone(solver_dir, m, Wnnz, Wsparse2dense)
