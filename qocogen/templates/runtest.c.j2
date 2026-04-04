@@ -1,0 +1,36 @@
+{% include '_license.j2' %}
+#include <stdio.h>
+#ifndef IS_WINDOWS
+#include <time.h>
+#endif
+#include "qoco_custom.h"
+
+int main() {
+   Workspace work;
+   set_default_settings(&work);
+   work.settings.verbose = 1;
+   double N = 1000;
+   double solve_time_sec = 1e10;
+   for (int i = 0; i < N; ++i) {
+#ifndef IS_WINDOWS
+       struct timespec start, end;
+       clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
+       load_data(&work);
+       qoco_custom_solve(&work);
+#ifndef IS_WINDOWS
+       clock_gettime(CLOCK_MONOTONIC, &end);
+       double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+       solve_time_sec = qoco_min(solve_time_sec, elapsed_time);
+#endif
+   }
+#ifndef IS_WINDOWS
+   printf("\nSolvetime: %.9f ms", 1e3 * solve_time_sec);
+#endif
+   FILE *file = fopen("result.bin", "wb");
+   fwrite(&work.sol.status, sizeof(unsigned char), 1, file);
+   fwrite(&work.sol.obj, sizeof(double), 1, file);
+   fwrite(&solve_time_sec, sizeof(double), 1, file);
+   fclose(file);
+   printf("\nobj: %f", work.sol.obj);
+}

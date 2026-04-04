@@ -1,0 +1,20 @@
+{% include '_license.j2' %}
+#ifndef QOCO_CUSTOM_KKT_H
+#define QOCO_CUSTOM_KKT_H
+
+#include "cone.h"
+#include "ldl.h"
+#include "workspace.h"
+
+{% if generate_ruiz %}
+void ruiz_equilibration(Workspace* work);
+void unequilibrate_data(Workspace* work);
+
+{% endif %}
+// Computes y = K * x where K is the permuted KKT matrix.
+void KKT_perm_product(double* x, double* y, Workspace* work);
+void compute_kkt_residual(Workspace* work);
+void construct_kkt_aff_rhs(Workspace* work);
+void construct_kkt_comb_rhs(Workspace* work);
+void predictor_corrector(Workspace* work);
+#endif

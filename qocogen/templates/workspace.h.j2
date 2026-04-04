@@ -1,0 +1,86 @@
+{% include '_license.j2' %}
+#ifndef QOCO_CUSTOM_WORKSPACE_H
+#define QOCO_CUSTOM_WORKSPACE_H
+
+typedef struct {
+   int max_iters;
+   int bisect_iters;
+   int ruiz_iters;
+   int iter_ref_iters;
+   double kkt_static_reg;
+   double kkt_dynamic_reg;
+   double abstol;
+   double reltol;
+   double abstol_inacc;
+   double reltol_inacc;
+   unsigned char verbose;
+} Settings;
+
+typedef struct {
+{{ declare_array('x', n, 'double') }}
+{{ declare_array('s', m, 'double') }}
+{{ declare_array('y', p, 'double') }}
+{{ declare_array('z', m, 'double') }}
+   int iters;
+   double obj;
+   double pres;
+   double dres;
+   double gap;
+   unsigned char status;
+} Solution;
+
+typedef struct {
+   int n;
+   int m;
+   int p;
+{{ declare_array('P', Pnnz, 'double') }}
+{{ declare_array('c', n, 'double') }}
+{{ declare_array('A', Annz, 'double') }}
+{{ declare_array('b', p, 'double') }}
+{{ declare_array('G', Gnnz, 'double') }}
+{{ declare_array('h', m, 'double') }}
+   int l;
+   int nsoc;
+{{ declare_array('q', q|length, 'int') }}
+   int perm[{{ n + m + p }}];
+   int Pnnz;
+   int Wnnz;
+{{ declare_array('x', n, 'double') }}
+{{ declare_array('s', m, 'double') }}
+{{ declare_array('y', p, 'double') }}
+{{ declare_array('z', m, 'double') }}
+{{ declare_array('L', Lnnz, 'double') }}
+{{ declare_array('D', n + m + p, 'double') }}
+{{ declare_array('W', Wnnz, 'double') }}
+{{ declare_array('lambda', m, 'double') }}
+{{ declare_array('xbuff', n, 'double') }}
+{{ declare_array('ubuff1', m, 'double') }}
+{{ declare_array('ubuff2', m, 'double') }}
+{{ declare_array('ubuff3', m, 'double') }}
+{{ declare_array('Ds', m, 'double') }}
+{{ declare_array('Winv', Wnnz, 'double') }}
+{{ declare_array('WtW', Wnnz, 'double') }}
+{{ declare_array('kkt_rhs', n + m + p, 'double') }}
+{{ declare_array('kkt_res', n + m + p, 'double') }}
+{{ declare_array('xyz', n + m + p, 'double') }}
+{{ declare_array('Druiz', n, 'double') }}
+{{ declare_array('Eruiz', p, 'double') }}
+{{ declare_array('Fruiz', m, 'double') }}
+{{ declare_array('Dinvruiz', n, 'double') }}
+{{ declare_array('Einvruiz', p, 'double') }}
+{{ declare_array('Finvruiz', m, 'double') }}
+   double k;
+   double kinv;
+{{ declare_array('xyzbuff', n + m + p, 'double') }}
+{{ declare_array('xyzbuff2', n + m + p, 'double') }}
+{{ declare_array('sbar', qmax, 'double') }}
+{{ declare_array('zbar', qmax, 'double') }}
+   double mu;
+   double sigma;
+   double a;
+
+   Settings settings;
+   Solution sol;
+} Workspace;
+
+#endif

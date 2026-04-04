@@ -1,0 +1,228 @@
+{% include '_license.j2' %}
+#include "kkt.h"
+
+{% if generate_ruiz %}
+void ruiz_equilibration(Workspace* work) {
+   for (int i = 0; i < work->n; ++i) {
+       work->Druiz[i] = 1.0;
+       work->Dinvruiz[i] = 1.0;
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->Eruiz[i] = 1.0;
+       work->Einvruiz[i] = 1.0;
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->Fruiz[i] = 1.0;
+       work->Finvruiz[i] = 1.0;
+   }
+   work->k = 1.0;
+   work->kinv = 1.0;
+
+   for (int iter = 0; iter < work->settings.ruiz_iters; ++iter) {
+       for (int i = 0; i < work->n + work->m + work->p; ++i) {
+           work->xyzbuff[i] = 0.0;
+       }
+
+       KKTrow_inf_norm(work->xyzbuff, work);
+       for (int i = 0; i < work->n + work->m + work->p; ++i) {
+           work->xyzbuff[i] = safe_div(1.0, qoco_sqrt(work->xyzbuff[i]));
+       }
+
+       // g = 1 / max(mean(Pinf), norm(c, "inf"));
+       double g = 0.0;
+       Pinf_norm(work->xbuff, work);
+       for (int i = 0; i < work->n; ++i) {
+           g += work->xbuff[i];
+       }
+       g /= work->n;
+       double cinf = qoco_custom_inf_norm(work->c, work->n);
+       g = qoco_max(g, cinf);
+       g = safe_div(1.0, g);
+       work->k *= g;
+
+       // Make scalings for all variables in a second-order cone equal.
+       int idx = work->l;
+       for (int j = 0; j < work->nsoc; ++j) {
+           for (int k = idx + 1; k < idx + work->q[j]; ++k) {
+               work->xyzbuff[work->n + work->p + k] = work->xyzbuff[work->n + work->p + idx];
+           }
+       idx += work->q[j];
+       }
+
+       // Scale P by g.
+       qoco_custom_scale_arrayf(work->P, work->P, g, work->Pnnz);
+       // Scale c.
+       qoco_custom_scale_arrayf(work->c, work->c, g, work->n);
+       qoco_custom_ew_product(work->c, work->xyzbuff, work->c, work->n);
+
+       // Scale P, A, G.
+       ruiz_scale_KKT(work->xyzbuff, work);
+
+       // Update scaling matrices.
+       qoco_custom_ew_product(work->Druiz, work->xyzbuff, work->Druiz, work->n);
+       qoco_custom_ew_product(work->Eruiz, &work->xyzbuff[work->n], work->Eruiz, work->p);
+       qoco_custom_ew_product(work->Fruiz, &work->xyzbuff[work->n + work->p], work->Fruiz, work->m);
+   }
+   // Scale b.
+   qoco_custom_ew_product(work->b, work->Eruiz, work->b, work->p);
+
+   // Scale h.
+   qoco_custom_ew_product(work->h, work->Fruiz, work->h, work->m);
+
+   // Compute Dinv, Einv, Finv.
+   work->kinv = safe_div(1.0, work->k);
+   for (int i = 0; i < work->n; ++i) {
+       work->Dinvruiz[i] = safe_div(1.0, work->Druiz[i]);
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->Einvruiz[i] = safe_div(1.0, work->Eruiz[i]);
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->Finvruiz[i] = safe_div(1.0, work->Fruiz[i]);
+   }
+}
+
+void unequilibrate_data(Workspace* work) {
+   qoco_custom_copy_arrayf(work->Dinvruiz, work->xyzbuff, work->n);
+   qoco_custom_copy_arrayf(work->Einvruiz, &work->xyzbuff[work->n], work->p);
+   qoco_custom_copy_arrayf(work->Finvruiz, &work->xyzbuff[work->n + work->p], work->m);
+   ruiz_scale_KKT(work->xyzbuff, work);
+   qoco_custom_scale_arrayf(work->P, work->P, work->kinv, work->Pnnz);
+   qoco_custom_scale_arrayf(work->c, work->c, work->kinv, work->n);
+   qoco_custom_ew_product(work->c, work->Dinvruiz, work->c, work->n);
+   qoco_custom_ew_product(work->b, work->Einvruiz, work->b, work->p);
+   qoco_custom_ew_product(work->h, work->Finvruiz, work->h, work->m);
+}
+
+{% endif %}
+void KKT_perm_product(double* x, double* y, Workspace* work) {
+{{ kkt_perm_product_body -}}
+}
+
+void compute_kkt_residual(Workspace* work) {
+   // Zero out NT Block.
+   for (int i = 0; i < work->Wnnz; ++i) {
+       work->WtW[i] = 0.0;
+   }
+   // Load [x;y;z] into xyzbuff.
+   for (int i = 0; i < work->n; ++i) {
+       work->xyzbuff[i] = work->x[i];
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->xyzbuff[i + work->n] = work->y[i];
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->xyzbuff[i + work->n + work->p] = work->z[i];
+   }
+
+   // Permute xyzbuff and store into xyz.
+   for (int i = 0; i < work->n + work->p + work->m; ++i) {
+       work->xyz[i] = work->xyzbuff[work->perm[i]];
+   }
+
+   KKT_perm_product(work->xyz, work->xyzbuff, work);
+
+   // Permute xyzbuff and store into xyz.
+   for (int i = 0; i < work->n + work->p + work->m; ++i) {
+       work->kkt_res[work->perm[i]] = work->xyzbuff[i];
+   }
+
+   // Add [c;-b;-h+s].
+   for (int i = 0; i < work->n; ++i) {
+       work->kkt_res[i] += work->c[i];
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->kkt_res[i + work->n] -= work->b[i];
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->kkt_res[i + work->n + work->p] += (work->s[i] - work->h[i]);
+   }
+
+}
+
+void construct_kkt_aff_rhs(Workspace* work) {
+   copy_and_negate_arrayf(work->kkt_res, work->kkt_rhs, work->n + work->p + work->m);
+   nt_multiply(work->W, work->lambda, work->ubuff1);
+   for (int i = 0; i < work->m; ++i) {
+       work->kkt_rhs[work->n + work->p + i] += work->ubuff1[i];
+   }
+}
+
+void construct_kkt_comb_rhs(Workspace* work) {
+   copy_and_negate_arrayf(work->kkt_res, work->kkt_rhs, work->n + work->p + work->m);
+   nt_multiply(work->Winv, work->Ds, work->ubuff1);
+   nt_multiply(work->W, &work->xyz[work->n + work->p], work->ubuff2);
+   cone_product(work->ubuff1, work->ubuff2, work->ubuff3, work->l, work->nsoc, work->q);
+   double sm = work->sigma * work->mu;
+   int idx = 0;
+   for (idx = 0; idx < work->l; ++idx) {
+       work->ubuff3[idx] -= sm;
+   }
+   for (int i = 0; i < work->nsoc; ++i) {
+       work->ubuff3[idx] -= sm;
+       idx += work->q[i];
+   }
+   cone_product(work->lambda, work->lambda, work->ubuff1, work->l, work->nsoc, work->q);
+   for (int i = 0; i < work->m; ++i) {
+       work->Ds[i] = -work->ubuff1[i] - work->ubuff3[i];
+   }
+   cone_division(work->lambda, work->Ds, work->ubuff2, work->l, work->nsoc, work->q);
+   nt_multiply(work->W, work->ubuff2, work->ubuff1);
+   for (int i = 0; i < work->m; ++i) {
+       work->kkt_rhs[work->n + work->p + i] -= work->ubuff1[i];
+   }
+}
+
+void predictor_corrector(Workspace* work) {
+   ldl(work);
+
+   // Construct rhs for affine scaling direction.
+   construct_kkt_aff_rhs(work);
+
+   // Solve KKT system to get affine scaling direction.
+   kkt_solve(work);
+
+   // Compute Dsaff.
+   nt_multiply(work->W, &work->xyz[work->n + work->p], work->ubuff1);
+   for (int i = 0; i < work->m; ++i) {
+       work->ubuff1[i] = -work->lambda[i] - work->ubuff1[i];
+   }
+   nt_multiply(work->W, work->ubuff1, work->Ds);
+
+   compute_centering(work);
+   construct_kkt_comb_rhs(work);
+   kkt_solve(work);
+
+   // Check if solution has NaNs. If NaNs are present, early exit and set a to 0.0 to trigger reduced tolerance optimality checks.
+   for (int i = 0; i < work->n + work->m + work->p; ++i) {
+       if (isnan(work->xyz[i])) {
+           work->a = 0.0;
+           return;
+       }
+   }
+   // Compute Dz.
+   cone_division(work->lambda, work->Ds, work->ubuff1, work->l, work->nsoc, work->q);
+   nt_multiply(work->W, &work->xyz[work->n + work->p], work->ubuff2);
+   for (int i = 0; i < work->m; ++i) {
+       work->ubuff3[i] = work->ubuff1[i] - work->ubuff2[i];
+   }
+   nt_multiply(work->W, work->ubuff3, work->Ds);
+
+   // Compute step-size.
+   double a = qoco_min(linesearch(work->s, work->Ds, 0.99, work), linesearch(work->z, &work->xyz[work->n + work->p], 0.99, work));
+   work->a = a;
+
+   // Update iterate.
+   for (int i = 0; i < work->n; ++i) {
+       work->x[i] += a * work->xyz[i];
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->s[i] += a * work->Ds[i];
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->y[i] += a * work->xyz[work->n + i];
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->z[i] += a * work->xyz[work->n + work->p + i];
+   }
+}

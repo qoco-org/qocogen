@@ -1,0 +1,307 @@
+{% include '_license.j2' %}
+#include "utils.h"
+
+void update_P(Workspace* work, double* P_new) {
+   for (int i = 0; i < {{ Pnnz }}; ++i) {
+       work->P[i] = P_new[i];
+   }
+}
+
+void update_A(Workspace* work, double* A_new) {
+   for (int i = 0; i < {{ Annz }}; ++i) {
+       work->A[i] = A_new[i];
+   }
+}
+
+void update_G(Workspace* work, double* G_new) {
+   for (int i = 0; i < {{ Gnnz }}; ++i) {
+       work->G[i] = G_new[i];
+   }
+}
+
+void update_c(Workspace* work, double* c_new) {
+   for (int i = 0; i < {{ n }}; ++i) {
+       work->c[i] = c_new[i];
+   }
+}
+
+void update_b(Workspace* work, double* b_new) {
+   for (int i = 0; i < {{ p }}; ++i) {
+       work->b[i] = b_new[i];
+   }
+}
+
+void update_h(Workspace* work, double* h_new) {
+   for (int i = 0; i < {{ m }}; ++i) {
+       work->h[i] = h_new[i];
+   }
+}
+
+{{ load_data_body }}
+void set_default_settings(Workspace* work) {
+   work->settings.max_iters = 200;
+   work->settings.bisect_iters = 5;
+{% if generate_ruiz %}
+   work->settings.ruiz_iters = 5;
+{% else %}
+   work->settings.ruiz_iters = 0;
+{% endif %}
+   work->settings.iter_ref_iters = 1;
+   work->settings.kkt_static_reg = 1e-8;
+   work->settings.kkt_dynamic_reg = 1e-8;
+   work->settings.abstol = 1e-7;
+   work->settings.reltol = 1e-7;
+   work->settings.abstol_inacc = 1e-5;
+   work->settings.reltol_inacc = 1e-5;
+   work->settings.verbose = 0;
+}
+
+void qoco_custom_copy_arrayf(double* x, double* y, int n) {
+   for (int i = 0; i < n; ++i) {
+      y[i] = x[i];
+   }
+}
+
+void copy_and_negate_arrayf(double* x, double* y, int n) {
+   for (int i = 0; i < n; ++i) {
+      y[i] = -x[i];
+   }
+}
+
+double qoco_custom_dot(double* x, double* y, int n) {
+   double ans = 0;
+      for (int i = 0; i < n; ++i) {
+         ans += x[i] * y[i];
+      }
+   return ans;
+}
+
+double qoco_custom_inf_norm(double* x, int n) {
+   double norm = 0.0;
+   double xi;
+   for (int i = 0; i < n; ++i) {
+       xi = qoco_abs(x[i]);
+       norm = qoco_max(norm , xi);
+   }
+   return norm;
+}
+
+{% if generate_ruiz %}
+void KKTrow_inf_norm(double* norm, Workspace* work) {
+   // Zero out NT Block.
+   for (int i = 0; i < work->Wnnz; ++i) {
+       work->WtW[i] = 0.0;
+   }
+{{ kktrow_norm_body -}}
+}
+
+void ruiz_scale_KKT(double* d, Workspace* work) {
+{{ ruiz_scale_body -}}
+}
+
+void Pinf_norm(double* norm, Workspace* work) {
+   // Clear norm buffer.
+   for (int i = 0; i < work->n; ++i) {
+       norm[i] = 0.0;
+   }
+{{ pinf_norm_body -}}
+}
+
+{% endif %}
+void qoco_custom_Px(double* x, double* y, Workspace* work) {
+{{ Px_body -}}
+}
+
+void qoco_custom_Ax(double* x, double* y, Workspace* work) {
+{{ Ax_body -}}
+}
+
+void Gx(double* x, double* y, Workspace* work) {
+{{ Gx_body -}}
+}
+
+void Atx(double* x, double* y, Workspace* work) {
+{{ Atx_body -}}
+}
+
+void Gtx(double* x, double* y, Workspace* work) {
+{{ Gtx_body -}}
+}
+
+void qoco_custom_scale_arrayf(double* x, double* y, double s, int n) {
+   for (int i = 0; i < n; ++i) {
+       y[i] = s * x[i];
+   }
+}
+
+void qoco_custom_ew_product(double* x, double* y, double* z, int n) {
+   for (int i = 0; i < n; ++i) {
+       z[i] = x[i] * y[i];
+   }
+}
+
+void qoco_custom_axpy(double* x, double* y, double* z, double a, int n) {
+   for (int i = 0; i < n; ++i) {
+       z[i] = a * x[i] + y[i];
+   }
+}
+
+unsigned char check_stopping(Workspace* work) {
+   // Compute objective.
+   double obj = qoco_custom_dot(work->c, work->x, work->n);
+   qoco_custom_Px(work->x, work->xbuff, work);
+   double xqoco_custom_Px = qoco_custom_dot(work->x, work->xbuff, work->n);
+   obj += 0.5 * qoco_custom_dot(work->x, work->xbuff, work->n);
+   work->sol.obj = obj * work->kinv;
+   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);
+   double qoco_custom_Pxinf = qoco_custom_inf_norm(work->xbuff, work->n);
+
+   // Compute primal residual, dual residual, and duality gap.
+   qoco_custom_ew_product(&work->kkt_res[work->n], work->Einvruiz, work->xbuff, work->p);
+   double eq_res = qoco_custom_inf_norm(work->xbuff, work->p);
+   qoco_custom_ew_product(&work->kkt_res[work->n + work->p], work->Finvruiz, work->ubuff1, work->m);
+   double conic_res = qoco_custom_inf_norm(work->ubuff1, work->m);
+   double pres = qoco_max(eq_res, conic_res);
+   qoco_custom_ew_product(work->kkt_res, work->Dinvruiz, work->xbuff, work->n);
+   qoco_custom_scale_arrayf(work->xbuff, work->xbuff, work->kinv, work->n);
+   double dres = qoco_custom_inf_norm(work->xbuff, work->n);
+   work->sol.pres = pres;
+   work->sol.dres = dres;
+
+   qoco_custom_ew_product(work->s, work->Fruiz, work->ubuff1, work->m);
+   qoco_custom_ew_product(work->z, work->Fruiz, work->ubuff2, work->m);
+   double gap = qoco_custom_dot(work->ubuff1, work->ubuff2, work->m);
+   gap *= work->kinv;
+   work->sol.gap = gap;
+
+   qoco_custom_ew_product(work->Einvruiz, work->b, work->xbuff, work->p);
+   double binf = work->p > 0 ? qoco_custom_inf_norm(work->xbuff, work->p) : 0;
+
+   qoco_custom_ew_product(work->Fruiz, work->s, work->ubuff1, work->m);
+   double sinf = work->m > 0 ? qoco_custom_inf_norm(work->ubuff1, work->m) : 0;
+
+   qoco_custom_ew_product(work->Dinvruiz, work->x, work->xbuff, work->n);
+   double cinf = work->n > 0 ? qoco_custom_inf_norm(work->xbuff, work->n) : 0;
+
+   qoco_custom_ew_product(work->Finvruiz, work->h, work->ubuff3, work->m);
+   double hinf = work->m > 0 ? qoco_custom_inf_norm(work->ubuff3, work->m) : 0;
+
+   Gtx(work->z, work->xbuff, work);
+   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);
+   double Gtzinf = qoco_custom_inf_norm(work->xbuff, work->n);
+
+   Atx(work->y, work->xbuff, work);
+   qoco_custom_ew_product(work->xbuff, work->Dinvruiz, work->xbuff, work->n);
+   double Atyinf = qoco_custom_inf_norm(work->xbuff, work->n);
+
+   Gx(work->x, work->ubuff1, work);
+   qoco_custom_ew_product(work->ubuff1, work->Finvruiz, work->ubuff1, work->m);
+   double Gxinf = qoco_custom_inf_norm(work->ubuff1, work->m);
+   qoco_custom_Ax(work->x, work->xbuff, work);
+   qoco_custom_ew_product(work->xbuff, work->Einvruiz, work->xbuff, work->p);
+   double Axinf = qoco_custom_inf_norm(work->xbuff, work->p);
+
+   // Compute max{Axinf, binf, Gxinf, hinf, sinf}.
+   double pres_rel = qoco_max(Axinf, binf);
+   pres_rel = qoco_max(pres_rel, Gxinf);
+   pres_rel = qoco_max(pres_rel, hinf);
+   pres_rel = qoco_max(pres_rel, sinf);
+
+   // Compute max{qoco_custom_Pxinf, Atyinf, Gtzinf, cinf}.
+   double dres_rel = qoco_max(qoco_custom_Pxinf, Atyinf);
+   dres_rel = qoco_max(dres_rel, Gtzinf);
+   dres_rel = qoco_max(dres_rel, cinf);
+   dres_rel *= work->kinv;
+
+   // Compute max{sinf, zinf}.
+   double ctx = qoco_custom_dot(work->c, work->x, work->n);
+   double bty = qoco_custom_dot(work->b, work->y, work->p);
+   double htz = qoco_custom_dot(work->h, work->z, work->m);
+
+   double pobj = 0.5 * xqoco_custom_Px + ctx;
+   double dobj = -0.5 * xqoco_custom_Px - bty - htz;
+   pobj = qoco_abs(pobj);
+   dobj = qoco_abs(dobj);
+
+   double gap_rel = qoco_max(1, pobj);
+   gap_rel = qoco_max(gap_rel, dobj);
+
+   // If the solver stalled (a = 0) check if low tolerance stopping criteria is met.
+   if(work->a < 1e-8) {
+      if (pres < work->settings.abstol_inacc + work->settings.reltol_inacc * pres_rel && dres < work->settings.abstol_inacc + work->settings.reltol_inacc * dres_rel && work->sol.gap < work->settings.abstol_inacc + work->settings.reltol_inacc * gap_rel) {
+           work->sol.status = QOCO_CUSTOM_SOLVED_INACCURATE;
+           return 1;
+      }
+      else {
+           work->sol.status = QOCO_CUSTOM_NUMERICAL_ERROR;
+           return 1;
+      }
+   }
+   if (pres < work->settings.abstol + work->settings.reltol * pres_rel && dres < work->settings.abstol + work->settings.reltol * dres_rel && work->sol.gap < work->settings.abstol + work->settings.reltol * gap_rel) {
+      work->sol.status = QOCO_CUSTOM_SOLVED;
+      return 1;
+   }
+   return 0;
+}
+
+void copy_solution(Workspace* work) {
+   qoco_custom_copy_arrayf(work->x, work->sol.x, work->n);
+   qoco_custom_copy_arrayf(work->s, work->sol.s, work->m);
+   qoco_custom_copy_arrayf(work->y, work->sol.y, work->p);
+   qoco_custom_copy_arrayf(work->z, work->sol.z, work->m);
+}
+
+void unscale_solution(Workspace* work) {
+   qoco_custom_ew_product(work->x, work->Druiz, work->x, work->n);
+   qoco_custom_ew_product(work->s, work->Finvruiz, work->s, work->m);
+   qoco_custom_ew_product(work->y, work->Eruiz, work->y, work->p);
+   qoco_custom_scale_arrayf(work->y, work->y, work->kinv, work->p);
+   qoco_custom_ew_product(work->z, work->Fruiz, work->z, work->m);
+   qoco_custom_scale_arrayf(work->z, work->z, work->kinv, work->m);
+}
+
+void print_header(Workspace* work) {
+#ifndef DISABLE_PRINTING
+   printf("\n");
+   printf("+-------------------------------------------------------+\n");
+   printf("|              QOCO Custom Generated Solver             |\n");
+   printf("|             (c) Govind M. Chari, 2025                 |\n");
+   printf("|    University of Washington Autonomous Controls Lab   |\n");
+   printf("+-------------------------------------------------------+\n");
+   printf("| Problem Data:                                         |\n");
+   printf("|     variables:        {{ "%-9d" | py_percent(n) }}                       |\n");
+   printf("|     constraints:      {{ "%-9d" | py_percent(n_constraints) }}                       |\n");
+   printf("|     eq constraints:   {{ "%-9d" | py_percent(p) }}                       |\n");
+   printf("|     ineq constraints: {{ "%-9d" | py_percent(l) }}                       |\n");
+   printf("|     soc constraints:  {{ "%-9d" | py_percent(nsoc) }}                       |\n");
+   printf("|     nnz(P):           {{ "%-9d" | py_percent(Pnnz) }}                       |\n");
+   printf("|     nnz(A):           {{ "%-9d" | py_percent(Annz) }}                       |\n");
+   printf("|     nnz(G):           {{ "%-9d" | py_percent(Gnnz) }}                       |\n");
+   printf("| Solver Settings:                                      |\n");
+   printf("|     max_iters: %-3d abstol: %3.2e reltol: %3.2e  |\n", work->settings.max_iters, work->settings.abstol, work->settings.reltol);
+   printf("|     abstol_inacc: %3.2e reltol_inacc: %3.2e     |\n", work->settings.abstol_inacc, work->settings.reltol_inacc);
+   printf("|     bisect_iters: %-2d iter_ref_iters: %-2d               |\n", work->settings.bisect_iters, work->settings.iter_ref_iters);
+   printf("|     ruiz_iters: %-2d kkt_static_reg: %3.2e           |\n", work->settings.ruiz_iters, work->settings.kkt_static_reg);
+   printf("|     kkt_dynamic_reg: %3.2e                         |\n", work->settings.kkt_dynamic_reg);
+   printf("+-------------------------------------------------------+\n");
+   printf("\n");
+   printf("+--------+-----------+------------+------------+------------+-----------+-----------+\n");
+   printf("|  Iter  |   Pcost   |    Pres    |    Dres    |     Gap    |     Mu    |    Step   |\n");
+   printf("+--------+-----------+------------+------------+------------+-----------+-----------+\n");
+#endif
+}
+
+void print_footer(Workspace* work) {
+#ifndef DISABLE_PRINTING
+   printf("\nstatus: %s ", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);
+   printf("\nnumber of iterations: %d ", work->sol.iters);
+   printf("\nobjective: %f ", work->sol.obj);
+#endif
+}
+
+void log_iter(Workspace* work) {
+#ifndef DISABLE_PRINTING
+printf("|   %2d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |   %.3f   |\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->a);
+printf("+--------+-----------+------------+------------+------------+-----------+-----------+\n");
+#endif
+}

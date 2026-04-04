@@ -1,0 +1,25 @@
+{% include '_license.j2' %}
+#ifndef QOCO_CUSTOM_CONE_H
+#define QOCO_CUSTOM_CONE_H
+
+#include "utils.h"
+
+void soc_product(double* u, double* v, double* p, int n);
+void soc_division(double* lam, double* v, double* d, int n);
+double soc_residual(double* u, int n);
+double soc_residual2(double* u, int n);
+double cone_residual(double* u, int l, int nsoc, int* q);
+void bring2cone(double* u, int l, int nsoc, int* q);
+void cone_product(double* u, double* v, double* p, int l, int nsoc, int* q);
+void cone_division(double* lambda, double* v, double* d, int l, int nsoc, int* q);
+void compute_mu(Workspace* work);
+void compute_nt_scaling(Workspace* work);
+void compute_lambda(Workspace* work);
+void compute_WtW(Workspace* work);
+// Computes z = W * x, where W has the same sparsity structure as the Nesterov-Todd scaling matrices.
+void nt_multiply(double* W, double* x, double* z);
+double linesearch(double* u, double* Du, double f, Workspace* work);
+double bisection_search(double* u, double* Du, double f, Workspace* work);
+double exact_linesearch(double* u, double* Du, double f, Workspace* work);
+void compute_centering(Workspace* work);
+#endif

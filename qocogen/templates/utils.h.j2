@@ -1,0 +1,65 @@
+{% include '_license.j2' %}
+#ifndef QOCO_CUSTOM_UTILS_H
+#define QOCO_CUSTOM_UTILS_H
+
+#include "workspace.h"
+
+#define qoco_abs(x) ((x)<0 ? -(x) : (x))
+#define safe_div(a, b) (qoco_abs(a) > 1e-15) ? (a / b) : 1e16
+#include <math.h>
+#define qoco_sqrt(a) sqrt(a)
+#define qoco_min(a, b) (((a) < (b)) ? (a) : (b))
+#define qoco_max(a, b) (((a) > (b)) ? (a) : (b))
+
+enum qoco_custom_solve_status {
+   QOCO_CUSTOM_UNSOLVED = 0,
+   QOCO_CUSTOM_SOLVED,
+   QOCO_CUSTOM_SOLVED_INACCURATE,
+   QOCO_CUSTOM_NUMERICAL_ERROR,
+   QOCO_CUSTOM_MAX_ITER,
+};
+
+static const char *QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[] = {
+   "unsolved",
+   "solved",
+   "solved inaccurately",
+   "numerical problems",
+   "maximum iterations reached",
+};
+
+void update_P(Workspace* work, double* P_new);
+void update_A(Workspace* work, double* A_new);
+void update_G(Workspace* work, double* G_new);
+void update_c(Workspace* work, double* c_new);
+void update_b(Workspace* work, double* b_new);
+void update_h(Workspace* work, double* h_new);
+
+void load_data(Workspace* work);
+void set_default_settings(Workspace* work);
+void qoco_custom_copy_arrayf(double* x, double* y, int n);
+void copy_and_negate_arrayf(double* x, double* y, int n);
+double qoco_custom_dot(double* x, double* y, int n);
+double qoco_custom_inf_norm(double* x, int n);
+{% if generate_ruiz %}
+void KKTrow_inf_norm(double* norm, Workspace* work);
+void ruiz_scale_KKT(double* d, Workspace* work);
+void Pinf_norm(double* norm, Workspace* work);
+{% endif %}
+void qoco_custom_qoco_custom_Px(double* x, double* y, Workspace* work);
+void qoco_custom_Ax(double* x, double* y, Workspace* work);
+void Gx(double* x, double* y, Workspace* work);
+void Atx(double* x, double* y, Workspace* work);
+void Gtx(double* x, double* y, Workspace* work);
+void qoco_custom_scale_arrayf(double* x, double* y, double s, int n);
+void qoco_custom_ew_product(double* x, double* y, double* z, int n);
+void qoco_custom_axpy(double* x, double* y, double* z, double a, int n);
+unsigned char check_stopping(Workspace* work);
+void copy_solution(Workspace* work);
+void unscale_solution(Workspace* work);
+#ifndef DISABLE_PRINTING
+#include <stdio.h>
+void print_header(Workspace* work);
+void print_footer(Workspace* work);
+void log_iter(Workspace* work);
+#endif
+#endif

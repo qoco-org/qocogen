@@ -1,0 +1,92 @@
+{% include '_license.j2' %}
+#include "qoco_custom.h"
+
+void initialize_ipm(Workspace* work) {
+   // Need to be set to 1.0 not 0.0 due to low tolerance stopping criteria checks
+   // which only occur when a = 0.0. If a is set to 0.0 then the low tolerance
+   // stopping criteria check would be triggered.
+   work->a = 1.0;
+   // Set NT block to I.
+   for (int i = 0; i < work->Wnnz; ++i) {
+       work->WtW[i] = 0.0;
+   }
+
+{% if not generate_ruiz %}
+   for (int i = 0; i < work->n; ++i) {
+       work->Druiz[i] = 1.0;
+       work->Dinvruiz[i] = 1.0;
+   }
+   for (int i = 0; i < work->p; ++i) {
+       work->Eruiz[i] = 1.0;
+       work->Einvruiz[i] = 1.0;
+   }
+   for (int i = 0; i < work->m; ++i) {
+       work->Fruiz[i] = 1.0;
+       work->Finvruiz[i] = 1.0;
+   }
+   work->k = 1.0;
+   work->kinv = 1.0;
+
+{% endif %}
+{{ wtw_init_body -}}
+
+   // kkt_rhs = [-c;b;h].
+   for(int i = 0; i < work->n; ++i) {
+       work->kkt_rhs[i] = -work->c[i];
+   }
+   for(int i = 0; i < work->p; ++i) {
+       work->kkt_rhs[work->n + i] = work->b[i];
+   }
+   for(int i = 0; i < work->m; ++i) {
+       work->kkt_rhs[work->n + work->p + i] = work->h[i];
+   }
+
+   ldl(work);
+   kkt_solve(work);
+   qoco_custom_copy_arrayf(work->xyz, work->x, work->n);
+   qoco_custom_copy_arrayf(&work->xyz[work->n], work->y, work->p);
+   qoco_custom_copy_arrayf(&work->xyz[work->n + work->p], work->z, work->m);
+   copy_and_negate_arrayf(&work->xyz[work->n + work->p], work->s, work->m);
+   bring2cone(work->s, work->l, work->nsoc, work->q);
+   bring2cone(work->z, work->l, work->nsoc, work->q);
+}
+
+void qoco_custom_solve(Workspace* work) {
+   if (work->settings.verbose) {
+       print_header(work);
+   }
+{% if generate_ruiz %}
+   ruiz_equilibration(work);
+{% endif %}
+   initialize_ipm(work);
+   for (int i = 1; i < work->settings.max_iters; ++i) {
+      compute_kkt_residual(work);
+      compute_mu(work);
+      if (check_stopping(work)) {
+           unscale_solution(work);
+{% if generate_ruiz %}
+           unequilibrate_data(work);
+{% endif %}
+           copy_solution(work);
+           if (work->settings.verbose) {
+               print_footer(work);
+           }
+         return;
+      }
+      compute_nt_scaling(work);
+      compute_lambda(work);
+      compute_WtW(work);
+      predictor_corrector(work);
+      work->sol.iters = i;
+      if (work->settings.verbose) {
+           log_iter(work);
+      }
+   }
+{% if generate_ruiz %}
+   unequilibrate_data(work);
+{% endif %}
+   work->sol.status = QOCO_CUSTOM_MAX_ITER;
+   if (work->settings.verbose) {
+       print_footer(work);
+   }
+}

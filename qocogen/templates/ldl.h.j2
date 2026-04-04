@@ -1,0 +1,16 @@
+{% include '_license.j2' %}
+#ifndef QOCO_CUSTOM_LDL_H
+#define QOCO_CUSTOM_LDL_H
+
+#include "kkt.h"
+#include "utils.h"
+#include "workspace.h"
+
+void ldl(Workspace* work);
+
+// Solves L*D*L'*xyzbuff = kkt_rhs.
+void tri_solve(Workspace* work);
+
+// Solves L*D*L'*xyz = kkt_rhs with iterative refinement.
+void kkt_solve(Workspace* work);
+#endif

@@ -1,0 +1,244 @@
+{% include '_license.j2' %}
+#include "cone.h"
+
+void soc_product(double* u, double* v, double* p, int n) {
+   p[0] = qoco_custom_dot(u, v, n);
+   for (int i = 1; i < n; ++i) {
+       p[i] = u[0] * v[i] + v[0] * u[i];
+   }
+}
+
+void soc_division(double* lam, double* v, double* d, int n) {
+   double f = lam[0] * lam[0] - qoco_custom_dot(&lam[1], &lam[1], n - 1);
+   double finv = safe_div(1.0, f);
+   double lam0inv = safe_div(1.0, lam[0]);
+   double lam1dv1 = qoco_custom_dot(&lam[1], &v[1], n - 1);
+   d[0] = finv * (lam[0] * v[0] - qoco_custom_dot(&lam[1], &v[1], n - 1));
+   for (int i = 1; i < n; ++i) {
+       d[i] = finv * (-lam[i] * v[0] + lam0inv * f * v[i] + lam0inv * lam1dv1 * lam[i]);
+   }
+}
+
+double soc_residual(double* u, int n) {
+   double res = 0;
+   for (int i = 1; i < n; ++i) {
+      res += u[i] * u[i];
+   }
+   res = qoco_sqrt(res) - u[0];
+   return res;
+}
+
+double soc_residual2(double* u, int n) {
+   double res = u[0] * u[0];
+   for (int i = 1; i < n; ++i) {
+      res -= u[i] * u[i];
+   }
+   return res;
+}
+
+double cone_residual(double* u, int l, int nsoc, int* q) {
+   double res = -1e7;
+   int idx;
+   for (idx = 0; idx < l; ++idx) {
+      res = qoco_max(-u[idx], res);
+   }
+   for (int i = 0; i < nsoc; ++i) {
+      res = qoco_max(soc_residual(&u[idx], q[i]), res);
+      idx += q[i];
+   }
+   return res;
+}
+
+void bring2cone(double* u, int l, int nsoc, int* q) {
+   if (cone_residual(u, l, nsoc, q) >= 0) {
+      double a = 0.0;
+
+      int idx;
+      for (idx = 0; idx < l; ++idx) {
+         a = qoco_max(a, -u[idx]);
+      }
+      a = qoco_max(a, 0.0);
+
+      for (int i = 0; i < nsoc; ++i) {
+         double soc_res = soc_residual(&u[idx], q[i]);
+         if (soc_res > 0 && soc_res > a) {
+            a = soc_res;
+         }
+         idx += q[i];
+      }
+      for (idx = 0; idx < l; ++idx) {
+         u[idx] += (1 + a);
+      }
+      for (int i = 0; i < nsoc; ++i) {
+         u[idx] += (1 + a);
+         idx += q[i];
+      }
+   }
+}
+
+void cone_product(double* u, double* v, double* p, int l, int nsoc, int* q) {
+   int idx;
+   for (idx = 0; idx < l; ++idx) {
+       p[idx] = u[idx] * v[idx];
+   }
+   for (int i = 0; i < nsoc; ++i) {
+       soc_product(&u[idx], &v[idx], &p[idx], q[i]);
+       idx += q[i];
+   }
+}
+
+void cone_division(double* lambda, double* v, double* d, int l, int nsoc, int* q) {
+   int idx;
+   for (idx = 0; idx < l; ++idx) {
+       d[idx] = safe_div(v[idx], lambda[idx]);
+   }
+   for (int i = 0; i < nsoc; ++i) {
+       soc_division(&lambda[idx], &v[idx], &d[idx], q[i]);
+       idx += q[i];
+   }
+}
+
+void compute_mu(Workspace* work) {
+{% if m == 0 %}
+   work->mu = 0.0;
+{% else %}
+   work->mu = (qoco_custom_dot(work->s, work->z, work->m) / work->m);
+{% endif %}
+}
+
+void compute_nt_scaling(Workspace* work) {
+{% for i in range(Wnnz) %}
+   work->W[{{ i }}] = 0.0;
+   work->Winv[{{ i }}] = 0.0;
+{% endfor %}
+   int idx;
+   for (idx = 0; idx < work->l; ++idx) {
+       work->W[idx] = qoco_sqrt(safe_div(work->s[idx], work->z[idx]));
+       work->Winv[idx] = safe_div(1.0, work->W[idx]);
+   }
+
+   int nt_idx = idx;
+   for (int i = 0; i < work->nsoc; ++i) {
+       // Compute normalized vectors.
+       double s_scal = soc_residual2(&work->s[idx], work->q[i]);
+       s_scal = qoco_sqrt(s_scal);
+       double f = safe_div(1.0, s_scal);
+       qoco_custom_scale_arrayf(&work->s[idx], work->sbar, f, work->q[i]);
+
+       double z_scal = soc_residual2(&work->z[idx], work->q[i]);
+       z_scal = qoco_sqrt(z_scal);
+       f = safe_div(1.0, z_scal);
+       qoco_custom_scale_arrayf(&work->z[idx], work->zbar, f, work->q[i]);
+
+       double gamma = qoco_sqrt(0.5 * (1 + qoco_custom_dot(work->sbar, work->zbar, work->q[i])));
+       f = safe_div(1.0, (2 * gamma));
+
+       // Overwrite sbar with wbar.
+       work->sbar[0] = f * (work->sbar[0] + work->zbar[0]);
+       for (int j = 1; j < work->q[i]; ++j) {
+           work->sbar[j] = f * (work->sbar[j] - work->zbar[j]);
+       }
+
+       // Overwrite zbar with v.
+       f = safe_div(1.0, qoco_sqrt(2 * (work->sbar[0] + 1)));
+       work->zbar[0] = f * (work->sbar[0] + 1.0);
+       for (int j = 1; j < work->q[i]; ++j) {
+           work->zbar[j] = f * work->sbar[j];
+       }
+
+       // Compute W for second-order cones.
+       int shift = 0;
+       f = qoco_sqrt(safe_div(s_scal, z_scal));
+       double finv = safe_div(1.0, f);
+       for (int j = 0; j < work->q[i]; ++j) {
+           for (int k = 0; k <= j; ++k) {
+               work->W[nt_idx + shift] = 2 * (work->zbar[k] * work->zbar[j]);
+               if (j != 0 && k == 0) {
+                   work->Winv[nt_idx + shift] = -work->W[nt_idx + shift];
+               }
+               else {
+                   work->Winv[nt_idx + shift] = work->W[nt_idx + shift];
+               }
+               if (j == k && j == 0) {
+                   work->W[nt_idx + shift] -= 1;
+                   work->Winv[nt_idx + shift] -= 1;
+               }
+               else if (j == k) {
+                   work->W[nt_idx + shift] += 1;
+                   work->Winv[nt_idx + shift] += 1;
+               }
+               work->W[nt_idx + shift] *= f;
+               work->Winv[nt_idx + shift] *= finv;
+               shift += 1;
+           }
+       }
+       idx += work->q[i];
+       nt_idx += (work->q[i] * work->q[i] + work->q[i]) / 2;
+   }
+}
+
+void compute_WtW(Workspace* work) {
+{{ compute_WtW_body -}}
+}
+
+void compute_lambda(Workspace* work) {
+   nt_multiply(work->W, work->z, work->lambda);
+}
+
+void nt_multiply(double* W, double* x, double* z) {
+{{ nt_multiply_body -}}
+}
+
+double linesearch(double* u, double* Du, double f, Workspace* work) {
+   if (work->nsoc == 0) {
+       return exact_linesearch(u, Du, f, work);
+   }
+   else {
+       return bisection_search(u, Du, f, work);
+   }
+}
+
+double bisection_search(double* u, double* Du, double f, Workspace* work) {
+   double al = 0.0;
+   double au = 1.0;
+   double a = 0.0;
+   for (int i = 0; i < work->settings.bisect_iters; ++i) {
+       a = 0.5 * (al + au);
+       qoco_custom_axpy(Du, u, work->ubuff1, safe_div(a, f), work->m);
+       if (cone_residual(work->ubuff1, work->l, work->nsoc, work->q) >= 0) {
+           au = a;
+       }
+       else {
+           al = a;
+       }
+   }
+   return al;
+}
+
+double exact_linesearch(double* u, double* Du, double f, Workspace* work) {
+   double a = 1.0;
+   double minval = 0;
+   // Compute a for LP cones.
+   for (int i = 0; i < work->l; ++i) {
+       if (Du[i] < minval * u[i])
+           minval = Du[i] / u[i];
+
+   }
+   if (-f < minval)
+       a = f;
+   else
+       a = -f / minval;
+
+   return a;
+}
+
+void compute_centering(Workspace* work) {
+   double a = qoco_min(linesearch(work->z, &work->xyz[work->n + work->p], 1.0, work), linesearch(work->s, work->Ds, 1.0, work));
+   qoco_custom_axpy(&work->xyz[work->n + work->p], work->z, work->ubuff1, a, work->m);
+   qoco_custom_axpy(work->Ds, work->s, work->ubuff2, a, work->m);
+   double rho = safe_div(qoco_custom_dot(work->ubuff1, work->ubuff2, work->m), qoco_custom_dot(work->z, work->s, work->m));
+   double sigma = qoco_min(1.0, rho);
+   sigma = qoco_max(0.0, sigma);
+   sigma = sigma * sigma * sigma;
+   work->sigma = sigma;
+}
