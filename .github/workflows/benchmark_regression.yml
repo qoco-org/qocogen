@@ -1,0 +1,84 @@
+name: Benchmark Regression
+
+on:
+  pull_request:
+    branches: [main]
+
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      diff_branch:
+        description: "Branch to compare against main (default: current branch)"
+        required: false
+        default: ""
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so we can checkout main later.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.28.x"
+
+      - name: Install GitHub CLI
+        run: sudo apt-get update -y && sudo apt-get install -y gh
+
+      - name: Authenticate GitHub CLI
+        run: gh auth setup-git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Python dependencies
+        run: pip install cvxpy scipy numpy
+
+      - name: Install qocogen (current branch)
+        run: pip install -e .
+
+      - name: Run benchmark comparison
+        env:
+          BRANCH_NAME: ${{ github.head_ref || inputs.diff_branch }}
+        run: |
+          python benchmarks/run_comparison.py \
+            --baseline-branch main \
+            --results-dir /tmp/qocogen_bench_results \
+            --solvers-dir /tmp/qocogen_bench_solvers
+
+      - name: Upload benchmark artifacts
+        id: upload_benchmarks
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: /tmp/qocogen_bench_results/
+
+      - name: Generate and upload regression report
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ARTIFACT_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.upload_benchmarks.outputs.artifact-id }}"
+        run: |
+          python -m benchmarks.utils.regression_report \
+            /tmp/qocogen_bench_results/main.csv \
+            /tmp/qocogen_bench_results/branch.csv
+          cat /tmp/regression-report.txt
+
+      - name: Upload regression report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-report
+          path: /tmp/regression-report.txt
+
+      - name: Comment regression report on PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/regression-report.txt

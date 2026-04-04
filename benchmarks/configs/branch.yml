@@ -1,0 +1,5 @@
+# Diff configuration: qocogen PR / feature branch.
+# The branch name is read from the BRANCH_NAME environment variable in CI.
+# For local use, set this to your branch name or leave it unset to use the current HEAD.
+qocogen:
+  branch: null  # null = use current HEAD (or BRANCH_NAME env var in CI)

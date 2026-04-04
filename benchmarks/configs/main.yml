@@ -1,0 +1,3 @@
+# Baseline configuration: qocogen main branch.
+qocogen:
+  branch: "main"
