@@ -38,7 +38,7 @@ File any issues or bug reports using the [issue tracker](https://github.com/qoco
 ## Citing
 ```
 @article{chari2026qoco,
-  title = {QOCO: a quadratic objective conic optimizer with custom solver generation},
+  title = {{QOCO}: a quadratic objective conic optimizer with custom solver generation},
   author = {Chari, Govind M. and A\c{c}ıkmeşe, Beh\c{c}et},
   journal = {Mathematical Programming Computation},
   issn = {1867-2957},
