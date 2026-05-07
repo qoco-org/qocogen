@@ -2,11 +2,26 @@
 # This source code is licensed under the BSD 3-Clause License
 
 import os
+import re
 import shutil
 import qdldl
 import numpy as np
 from scipy import sparse
 from qocogen.codegen_utils import write_license, write_Kelem, declare_array, write_license_file
+
+
+def _project_version():
+    pyproject = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml")
+    with open(pyproject, "r", encoding="utf-8") as f:
+        text = f.read()
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
+    if not match:
+        raise RuntimeError("Could not find project version in pyproject.toml")
+    return match.group(1)
+
+
+def _banner_line(text):
+    return "|" + text.center(55) + "|"
 
 
 def _generate_solver(
@@ -224,6 +239,12 @@ def generate_workspace(solver_dir, n, m, p, P, c, A, b, G, h, q, Lnnz, Wnnz):
     declare_array(f, "b", p, "double")
     declare_array(f, "G", Gnnz, "double")
     declare_array(f, "h", m, "double")
+    f.write("   double obj_range_min;\n")
+    f.write("   double obj_range_max;\n")
+    f.write("   double constraint_range_min;\n")
+    f.write("   double constraint_range_max;\n")
+    f.write("   double rhs_range_min;\n")
+    f.write("   double rhs_range_max;\n")
     f.write("   int l;\n")
     f.write("   int nsoc;\n")
     declare_array(f, "q", len(q), "int")
@@ -1178,6 +1199,8 @@ def generate_utils(
     f.write("void copy_and_negate_arrayf(double* x, double* y, int n);\n")
     f.write("double qoco_custom_dot(double* x, double* y, int n);\n")
     f.write("double qoco_custom_inf_norm(double* x, int n);\n")
+    f.write("double min_abs_val(double* x, int n);\n")
+    f.write("void compute_scaling_statistics(Workspace* work);\n")
     if generate_ruiz:
         f.write("void KKTrow_inf_norm(double* norm, Workspace* work);\n")
         f.write("void ruiz_scale_KKT(double* d, Workspace* work);\n")
@@ -1208,6 +1231,7 @@ def generate_utils(
     Pnnz = len(P.data) if P is not None else 0
     Annz = len(A.data) if A is not None else 0
     Gnnz = len(G.data) if G is not None else 0
+    version_line = _banner_line("v" + _project_version())
 
     f = open(solver_dir + "/utils.c", "a")
     write_license(f)
@@ -1216,6 +1240,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % Pnnz)
     f.write("       work->P[i] = P_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1224,6 +1249,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % Annz)
     f.write("       work->A[i] = A_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1232,6 +1258,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % Gnnz)
     f.write("       work->G[i] = G_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1240,6 +1267,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % n)
     f.write("       work->c[i] = c_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1248,6 +1276,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % p)
     f.write("       work->b[i] = b_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1256,6 +1285,7 @@ def generate_utils(
     f.write("   for (int i = 0; i < %d; ++i) {\n" % m)
     f.write("       work->h[i] = h_new[i];\n")
     f.write("   }\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("   work->sol.status = QOCO_CUSTOM_UNSOLVED;\n")
     f.write("   work->best_valid = 0;\n")
     f.write("}\n\n")
@@ -1319,6 +1349,7 @@ def generate_utils(
     f.write("   work->best_metric = 0.0;\n")
     f.write("   work->best_iter = -1;\n")
     f.write("   work->best_valid = 0;\n")
+    f.write("   compute_scaling_statistics(work);\n")
     f.write("}\n\n")
 
     f.write("void set_default_settings(Workspace* work) {\n")
@@ -1368,6 +1399,53 @@ def generate_utils(
     f.write("       norm = qoco_max(norm , xi);\n")
     f.write("   }\n")
     f.write("   return norm;\n")
+    f.write("}\n\n")
+
+    f.write("double min_abs_val(double* x, int n) {\n")
+    f.write("   if (n == 0) {\n")
+    f.write("       return QOCOFloat_MAX;\n")
+    f.write("   }\n")
+    f.write("   double min_val = QOCOFloat_MAX;\n")
+    f.write("   for (int i = 0; i < n; ++i) {\n")
+    f.write("       double xi = qoco_abs(x[i]);\n")
+    f.write("       min_val = qoco_min(min_val, xi);\n")
+    f.write("   }\n")
+    f.write("   return min_val;\n")
+    f.write("}\n\n")
+
+    f.write("void compute_scaling_statistics(Workspace* work) {\n")
+    f.write("   work->obj_range_min = QOCOFloat_MAX;\n")
+    f.write("   work->obj_range_max = 0.0;\n")
+    f.write("   work->constraint_range_min = QOCOFloat_MAX;\n")
+    f.write("   work->constraint_range_max = 0.0;\n")
+    f.write("   work->rhs_range_min = QOCOFloat_MAX;\n")
+    f.write("   work->rhs_range_max = 0.0;\n\n")
+    if Pnnz > 0:
+        f.write("   work->obj_range_min = min_abs_val(work->P, %d);\n" % Pnnz)
+        f.write("   work->obj_range_max = qoco_custom_inf_norm(work->P, %d);\n" % Pnnz)
+    f.write("   work->obj_range_min = qoco_min(work->obj_range_min, min_abs_val(work->c, work->n));\n")
+    f.write("   work->obj_range_max = qoco_max(work->obj_range_max, qoco_custom_inf_norm(work->c, work->n));\n\n")
+    if Annz > 0:
+        f.write("   work->constraint_range_min = min_abs_val(work->A, %d);\n" % Annz)
+        f.write("   work->constraint_range_max = qoco_custom_inf_norm(work->A, %d);\n" % Annz)
+    if Gnnz > 0:
+        f.write("   work->constraint_range_min = qoco_min(work->constraint_range_min, min_abs_val(work->G, %d));\n" % Gnnz)
+        f.write("   work->constraint_range_max = qoco_max(work->constraint_range_max, qoco_custom_inf_norm(work->G, %d));\n" % Gnnz)
+    f.write("\n")
+    f.write("   if (work->p > 0) {\n")
+    f.write("       work->rhs_range_min = min_abs_val(work->b, work->p);\n")
+    f.write("       work->rhs_range_max = qoco_custom_inf_norm(work->b, work->p);\n")
+    f.write("   }\n")
+    f.write("   if (work->m > 0) {\n")
+    f.write("       work->rhs_range_min = qoco_min(work->rhs_range_min, min_abs_val(work->h, work->m));\n")
+    f.write("       work->rhs_range_max = qoco_max(work->rhs_range_max, qoco_custom_inf_norm(work->h, work->m));\n")
+    f.write("   }\n\n")
+    f.write("   if (work->obj_range_min == QOCOFloat_MAX || work->obj_range_min == 0.0) work->obj_range_min = 0.0;\n")
+    f.write("   if (work->obj_range_max == QOCOFloat_MAX || work->obj_range_max == 0.0) work->obj_range_max = 0.0;\n")
+    f.write("   if (work->constraint_range_min == QOCOFloat_MAX || work->constraint_range_min == 0.0) work->constraint_range_min = 0.0;\n")
+    f.write("   if (work->constraint_range_max == QOCOFloat_MAX || work->constraint_range_max == 0.0) work->constraint_range_max = 0.0;\n")
+    f.write("   if (work->rhs_range_min == QOCOFloat_MAX || work->rhs_range_min == 0.0) work->rhs_range_min = 0.0;\n")
+    f.write("   if (work->rhs_range_max == QOCOFloat_MAX || work->rhs_range_max == 0.0) work->rhs_range_max = 0.0;\n")
     f.write("}\n\n")
 
     if generate_ruiz:
@@ -1810,6 +1888,9 @@ def generate_utils(
         '   printf("|              QOCO Custom Generated Solver             |\\n");\n'
     )
     f.write(
+        '   printf("%s\\n");\n' % version_line
+    )
+    f.write(
         '   printf("|             (c) Govind M. Chari, 2025                 |\\n");\n'
     )
     f.write(
@@ -1847,6 +1928,18 @@ def generate_utils(
         '   printf("|     nnz(G):           %-9d                       |\\n");\n' % Gnnz
     )
     f.write(
+        '   printf("| Scaling Statistics:                                   |\\n");\n'
+    )
+    f.write(
+        '   printf("|     Objective range      [%.0e, %.0e]               |\\n", work->obj_range_min, work->obj_range_max);\n'
+    )
+    f.write(
+        '   printf("|     Constraint range     [%.0e, %.0e]               |\\n", work->constraint_range_min, work->constraint_range_max);\n'
+    )
+    f.write(
+        '   printf("|     RHS range            [%.0e, %.0e]               |\\n", work->rhs_range_min, work->rhs_range_max);\n'
+    )
+    f.write(
         '   printf("| Solver Settings:                                      |\\n");\n'
     )
     f.write(
@@ -1856,13 +1949,13 @@ def generate_utils(
         '   printf("|     abstol_inacc: %3.2e reltol_inacc: %3.2e     |\\n", work->settings.abstol_inacc, work->settings.reltol_inacc);\n'
     )
     f.write(
-        '   printf("|     max_ir_iters: %-2d ir_tol: %3.2e            |\\n", work->settings.max_ir_iters, work->settings.ir_tol);\n'
+        '   printf("|     kkt_static_reg_P: %3.2e ruiz_iters: %-2d         |\\n", work->settings.kkt_static_reg_P, work->settings.ruiz_iters);\n'
     )
     f.write(
-        '   printf("|     ruiz_iters: %-2d kkt_static_reg_P: %3.2e         |\\n", work->settings.ruiz_iters, work->settings.kkt_static_reg_P);\n'
+        '   printf("|     kkt_static_reg_A: %3.2e max_ir_iters: %-2d       |\\n", work->settings.kkt_static_reg_A, work->settings.max_ir_iters);\n'
     )
     f.write(
-        '   printf("|     kkt_static_reg_A: %3.2e kkt_static_reg_G: %3.2e |\\n", work->settings.kkt_static_reg_A, work->settings.kkt_static_reg_G);\n'
+        '   printf("|     kkt_static_reg_G: %3.2e ir_tol: %3.2e       |\\n", work->settings.kkt_static_reg_G, work->settings.ir_tol);\n'
     )
     f.write(
         '   printf("|     kkt_dynamic_reg: %3.2e                         |\\n", work->settings.kkt_dynamic_reg);\n'
@@ -1872,34 +1965,42 @@ def generate_utils(
     )
     f.write('   printf("\\n");\n')
     f.write(
-        '   printf("+--------+-----------+------------+------------+------------+-----------+-----------+\\n");\n'
+        '   printf("+--------+-----------+------------+------------+------------+-----------+------+-----------+\\n");\n'
     )
     f.write(
-        '   printf("|  Iter  |   Pcost   |    Pres    |    Dres    |     Gap    |     Mu    |    Step   |\\n");\n'
+        '   printf("|  Iter  |   Pcost   |    Pres    |    Dres    |     Gap    |     Mu    |  IR  |    Step   |\\n");\n'
     )
     f.write(
-        '   printf("+--------+-----------+------------+------------+------------+-----------+-----------+\\n");\n'
+        '   printf("+--------+-----------+------------+------------+------------+-----------+------+-----------+\\n");\n'
     )
     f.write("#endif\n")
     f.write("}\n\n")
 
     f.write("void print_footer(Workspace* work) {\n")
     f.write("#ifndef DISABLE_PRINTING\n")
+    f.write('   printf("\\n");\n')
     f.write(
-        '   printf("\\nstatus: %s ", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);\n'
+        '   printf("status:                %s\\n", QOCO_CUSTOM_SOLVE_STATUS_MESSAGE[work->sol.status]);\n'
     )
-    f.write('   printf("\\nnumber of iterations: %d ", work->sol.iters);\n')
-    f.write('   printf("\\nobjective: %f ", work->sol.obj);\n')
+    f.write(
+        '   printf("number of iterations:  %d\\n", work->sol.iters);\n'
+    )
+    f.write(
+        '   printf("objective:             %+.3f\\n", work->sol.obj);\n'
+    )
+    f.write('   printf("setup time:            %.2e sec\\n", 0.0);\n')
+    f.write('   printf("solve time:            %.2e sec\\n", 0.0);\n')
+    f.write('   printf("\\n");\n')
     f.write("#endif\n")
     f.write("}\n\n")
 
     f.write("void log_iter(Workspace* work) {\n")
     f.write("#ifndef DISABLE_PRINTING\n")
     f.write(
-        'printf("|   %2d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |   %.3f   |\\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->a);\n'
+        'printf("|  %3d   | %+.2e | %+.3e | %+.3e | %+.3e | %+.2e |  %2d  |   %.3f   |\\n",work->sol.iters, work->sol.obj, work->sol.pres, work->sol.dres, work->sol.gap, work->mu, work->ir_iters, work->a);\n'
     )
     f.write(
-        'printf("+--------+-----------+------------+------------+------------+-----------+-----------+\\n");'
+        'printf("+--------+-----------+------------+------------+------------+-----------+------+-----------+\\n");'
     )
     f.write("\n#endif\n")
     f.write("}\n")
