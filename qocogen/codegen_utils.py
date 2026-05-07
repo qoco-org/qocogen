@@ -4,7 +4,8 @@
 from datetime import datetime
 
 
-# Writes the 1D array index of the (i,j) element of the KKT matrix [P+reg*I A' G';A -reg*I 0;G 0 -W'W]
+# Writes the 1D array index of the (i,j) element of the KKT matrix
+# [P+reg_P*I A' G'; A -reg_A*I 0; G 0 -W'W-reg_G*I].
 def write_Kelem(f, i, j, n, m, p, P, A, G, perm, Wsparse2dense, reg, print):
 
     # Row and column to access within KKT matrix.
@@ -22,16 +23,17 @@ def write_Kelem(f, i, j, n, m, p, P, A, G, perm, Wsparse2dense, reg, print):
         if P is not None:
             if P[i, j] == 0.0:
                 if print and reg and i == j:
-                    f.write(" work->settings.kkt_static_reg")
+                    f.write("work->settings.kkt_static_reg_P")
+                    return True
                 return False
             elif print:
                 # need to get index of P[i,j] in the data array for P.
                 dataidx = get_data_idx(P, i, j)
                 f.write("work->P[%d]" % dataidx)
             if i == j and reg and print:
-                f.write(" + work->settings.kkt_static_reg")
+                f.write(" + work->settings.kkt_static_reg_P")
         elif P is None and i == j and reg and print:
-            f.write("work->settings.kkt_static_reg")
+            f.write("work->settings.kkt_static_reg_P")
         else:
             return False
 
@@ -76,7 +78,7 @@ def write_Kelem(f, i, j, n, m, p, P, A, G, perm, Wsparse2dense, reg, print):
             # f.write("0")
             return False
         elif reg and print:
-            f.write("-work->settings.kkt_static_reg")
+            f.write("-work->settings.kkt_static_reg_A")
         else:
             return False
 
@@ -99,7 +101,7 @@ def write_Kelem(f, i, j, n, m, p, P, A, G, perm, Wsparse2dense, reg, print):
         if Wsparse2dense[col * m + row] != -1 and print:
             f.write(" - work->WtW[%d]" % Wsparse2dense[col * m + row])
             if row == col and print and reg:
-                f.write(" - work->settings.kkt_static_reg")
+                f.write(" - work->settings.kkt_static_reg_G")
         else:
             # f.write("0")
             return False
