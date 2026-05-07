@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href=https://github.com/qoco-org/qocogen/actions/workflows/unit_tests.yml/badge.svg"><img src="https://github.com/qoco-org/qocogen/actions/workflows/unit_tests.yml/badge.svg"/></a>
+  <a href="https://github.com/qoco-org/qocogen/actions/workflows/unit_tests.yml"><img src="https://github.com/qoco-org/qocogen/actions/workflows/unit_tests.yml/badge.svg"/></a>
   <a href="https://img.shields.io/pypi/dm/qocogen.svg?label=Pypi%20downloads"><img src="https://img.shields.io/pypi/dm/qocogen.svg?label=Pypi%20downloads" alt="PyPI Downloads" /></a>
   <a href="https://arxiv.org/abs/2503.12658"><img src="http://img.shields.io/badge/arXiv-2503.12658-B31B1B.svg"/></a>
   <a href="https://qoco-org.github.io/qoco/codegen/index.html"><img src="https://img.shields.io/badge/docs-online-brightgreen?logo=read-the-docs&style=flat" alt="Documentation" /></a>
