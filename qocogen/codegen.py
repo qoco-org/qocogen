@@ -6,18 +6,26 @@ import re
 import shutil
 import qdldl
 import numpy as np
+from importlib.metadata import PackageNotFoundError, version
 from scipy import sparse
 from qocogen.codegen_utils import write_license, write_Kelem, declare_array, write_license_file
 
 
 def _project_version():
+    try:
+        return version("qocogen")
+    except PackageNotFoundError:
+        pass
+
     pyproject = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml")
-    with open(pyproject, "r", encoding="utf-8") as f:
-        text = f.read()
-    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
-    if not match:
-        raise RuntimeError("Could not find project version in pyproject.toml")
-    return match.group(1)
+    if os.path.exists(pyproject):
+        with open(pyproject, "r", encoding="utf-8") as f:
+            text = f.read()
+        match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
+        if match:
+            return match.group(1)
+
+    return "unknown"
 
 
 def _banner_line(text):
