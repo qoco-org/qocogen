@@ -1988,8 +1988,6 @@ def generate_utils(
     f.write(
         '   printf("objective:             %+.3f\\n", work->sol.obj);\n'
     )
-    f.write('   printf("setup time:            %.2e sec\\n", 0.0);\n')
-    f.write('   printf("solve time:            %.2e sec\\n", 0.0);\n')
     f.write('   printf("\\n");\n')
     f.write("#endif\n")
     f.write("}\n\n")
